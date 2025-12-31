@@ -1,0 +1,64 @@
+<script>
+(function () {
+
+  const STYLE_ID = "omniforge-label-outline-unified";
+  if (document.getElementById(STYLE_ID)) return;
+  
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.innerHTML = `
+    /* ========================================
+       TODAS AS LABELS DO CHATWOOT
+       ======================================== */
+    .label.smooth {
+      background: transparent !important;
+      border: none !important;
+      outline-style: solid !important;
+      outline-width: 2px !important;
+      outline-offset: -2px !important;
+      border-radius: 9999px !important;
+      font-weight: 500;
+    }
+
+    /* Padding para labels pequenas */
+    .label.smooth.small {
+      padding: 3px 10px !important;
+    }
+
+    /* Padding para labels normais */
+    .label.smooth:not(.small) {
+      padding: 4px 12px !important;
+    }
+    
+    /* LIGHT MODE → TEXTO PRETO */
+    html[data-theme="light"] .label.smooth,
+    html[data-theme="light"] .label.smooth span {
+      color: #000000 !important;
+    }
+    
+    /* DARK MODE → TEXTO BRANCO */
+    html[data-theme="dark"] .label.smooth,
+    html[data-theme="dark"] .label.smooth span {
+      color: #ffffff !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  /* APLICA COR DA LABEL NA OUTLINE */
+  function applyOutlineColor() {
+    document.querySelectorAll(".label.smooth").forEach(label => {
+      const dot = label.querySelector(".label-color-dot");
+      if (!dot) return;
+      const color = getComputedStyle(dot).backgroundColor;
+      label.style.outlineColor = color;
+    });
+  }
+
+  const observer = new MutationObserver(applyOutlineColor);
+  observer.observe(document.body, { childList: true, subtree: true });
+  applyOutlineColor();
+
+  console.log("✅ [OmniForge] Outline aplicado em TODAS as labels");
+
+})();
+</script>
