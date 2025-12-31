@@ -1,0 +1,186 @@
+<script>
+(function () {
+
+  /* ================================
+     PAINEL 1: AGENTE SUPORTE
+  ================================= */
+  const AGENTE_APP_ID = "omniforge-agente-panel";
+  const AGENTE_BTN_ID = "omniforge-agente-btn";
+  const AGENTE_IFRAME_URL = "https://webhook.skycracker.com.br/webhook/chat_ativar";
+  const AGENTE_BUTTON_TITLE = "Agente Suporte";
+  const AGENTE_BUTTON_ICON = "☢︎";
+
+  /* ================================
+     PAINEL 2: OMNIFORGE PAINEL (ABAS)
+  ================================= */
+  const PAINEL_APP_ID = "omniforge-painel-panel";
+  const PAINEL_BTN_ID = "omniforge-painel-btn";
+  const PAINEL_IFRAME_URL = "https://webhook.skycracker.com.br/webhook/omniforge-painel";
+  const PAINEL_BUTTON_TITLE = "OmniForge Painel";
+  const PAINEL_BUTTON_ICON = "⚡";
+
+  /* ================================
+     CONTEXTO DA CONVERSA
+  ================================= */
+  function getContextFromURL() {
+    const path = window.location.pathname;
+    const account = path.match(/accounts\/(\d+)/);
+    const conversation = path.match(/conversations\/(\d+)/);
+
+    return {
+      account_id: account?.[1] || null,
+      conversation_id: conversation?.[1] || null
+    };
+  }
+
+  /* ================================
+     FUNÇÃO GENÉRICA: CRIAR PAINEL
+  ================================= */
+  function ensurePanel(appId, title, subtitleColor = "#22C55E", subtitleText = "online") {
+    if (document.getElementById(appId)) return;
+
+    const panel = document.createElement("div");
+    panel.id = appId;
+
+    Object.assign(panel.style, {
+      position: "fixed",
+      top: "0",
+      right: "0",
+      width: "440px",
+      height: "100vh",
+      background: "var(--color-background, #0B1117)",
+      borderLeft: "1px solid #1E293B",
+      zIndex: "9999",
+      display: "none",
+      boxShadow: "-4px 0 12px rgba(0,0,0,.4)",
+      fontFamily: "Inter, system-ui, sans-serif",
+      color: "#E5E7EB"
+    });
+
+    panel.innerHTML = `
+      <div style="padding:12px 14px;border-bottom:1px solid #1E293B;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${title}</strong>
+          <button id="${appId}-close"
+            style="background:none;border:none;font-size:18px;cursor:pointer;color:#94A3B8;">
+            ✕
+          </button>
+        </div>
+
+        <div style="margin-top:6px;font-size:12px;color:${subtitleColor};">${subtitleText}</div>
+
+        <div style="margin-top:8px;font-size:12px;color:#94A3B8;">
+          <strong>Account:</strong> <span id="${appId}-account">—</span>
+          &nbsp;•&nbsp;
+          <strong>Conversation:</strong> <span id="${appId}-conversation">—</span>
+        </div>
+      </div>
+
+      <iframe
+        id="${appId}-iframe"
+        style="width:100%;height:calc(100% - 104px);border:none;"
+        src="about:blank">
+      </iframe>
+    `;
+
+    document.body.appendChild(panel);
+    document.getElementById(`${appId}-close`).onclick = () => closePanel(appId);
+  }
+
+  /* ================================
+     FUNÇÃO GENÉRICA: ABRIR PAINEL
+  ================================= */
+  function openPanel(appId, iframeUrl) {
+    const { account_id, conversation_id } = getContextFromURL();
+    if (!account_id || !conversation_id) return;
+
+    document.getElementById(`${appId}-account`).textContent = account_id;
+    document.getElementById(`${appId}-conversation`).textContent = conversation_id;
+
+    document.getElementById(`${appId}-iframe`).src =
+      `${iframeUrl}` +
+      `?account_id=${encodeURIComponent(account_id)}` +
+      `&conversation_id=${encodeURIComponent(conversation_id)}` +
+      `&embed=1`;
+
+    document.getElementById(appId).style.display = "block";
+  }
+
+  /* ================================
+     FUNÇÃO GENÉRICA: FECHAR PAINEL
+  ================================= */
+  function closePanel(appId) {
+    const panel = document.getElementById(appId);
+    if (!panel) return;
+
+    panel.style.display = "none";
+    document.getElementById(`${appId}-iframe`).src = "about:blank";
+  }
+
+  /* ================================
+     FUNÇÃO GENÉRICA: INJETAR BOTÃO
+  ================================= */
+  function injectButton(btnId, title, icon, onClick) {
+    if (document.getElementById(btnId)) return;
+
+    const leftWrap = document.querySelector("div.left-wrap");
+    if (!leftWrap) return;
+
+    const refButton = leftWrap.querySelector("button");
+    if (!refButton) return;
+
+    const btn = document.createElement("button");
+    btn.id = btnId;
+    btn.type = "button";
+    btn.title = title;
+    btn.className = refButton.className;
+    btn.innerHTML = `<span>${icon}</span>`;
+    btn.onclick = onClick;
+
+    leftWrap.appendChild(btn);
+  }
+
+  /* ================================
+     SINCRONIZAÇÃO
+  ================================= */
+  function sync() {
+    // Painel 1: Agente Suporte
+    ensurePanel(AGENTE_APP_ID, "Agente · OmniChat", "#22C55E", "online");
+    injectButton(
+      AGENTE_BTN_ID,
+      AGENTE_BUTTON_TITLE,
+      AGENTE_BUTTON_ICON,
+      () => openPanel(AGENTE_APP_ID, AGENTE_IFRAME_URL)
+    );
+
+    // Painel 2: OmniForge Painel (com abas)
+    ensurePanel(PAINEL_APP_ID, "OmniForge · Painel", "#3B82F6", "multi-ferramentas");
+    injectButton(
+      PAINEL_BTN_ID,
+      PAINEL_BUTTON_TITLE,
+      PAINEL_BUTTON_ICON,
+      () => openPanel(PAINEL_APP_ID, PAINEL_IFRAME_URL)
+    );
+  }
+
+  /* ================================
+     INICIALIZAÇÃO
+  ================================= */
+  sync();
+  new MutationObserver(sync).observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  /* ================================
+     LISTENER PARA FECHAR PAINÉIS
+  ================================= */
+  window.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "OMNIFORGE_CLOSE_PANEL") {
+      closePanel(AGENTE_APP_ID);
+      closePanel(PAINEL_APP_ID);
+    }
+  });
+
+})();
+</script>
