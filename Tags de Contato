@@ -1,0 +1,442 @@
+<script>
+(function () {
+
+  const API_URL = "https://chat.omniforge.com.br/api/v1";
+  const API_TOKEN = "c7ANdoedRTRiSQJLhR1K9Dae";
+
+  const STYLE_ID = "omniforge-tags-outline";
+  if (!document.getElementById(STYLE_ID)) {
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.innerHTML = `
+      .omniforge-tag {
+        background: transparent !important;
+        border: none !important;
+        outline-style: solid !important;
+        outline-width: 2px !important;
+        outline-offset: -2px !important;
+        border-radius: 9999px !important;
+        padding: 3px 10px !important;
+        font-weight: 500 !important;
+        font-size: 11px !important;
+        cursor: pointer !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+      }
+      
+      html[data-theme="dark"] .omniforge-tag,
+      html[data-theme="dark"] .omniforge-tag span {
+        color: #ffffff !important;
+      }
+      
+      html[data-theme="light"] .omniforge-tag,
+      html[data-theme="light"] .omniforge-tag span {
+        color: #000000 !important;
+      }
+      
+      .omniforge-tag:hover { opacity: 0.8; }
+      
+      .omniforge-tag-dot {
+        width: 8px !important;
+        height: 8px !important;
+        border-radius: 2px !important;
+        flex-shrink: 0 !important;
+      }
+      
+      .omniforge-tag-x {
+        opacity: 0.8;
+        margin-left: 2px;
+        font-size: 14px;
+      }
+      .omniforge-tag-x:hover { opacity: 1; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  let state = {
+    accountId: null,
+    conversationId: null,
+    contactId: null,
+    labels: [],
+    tagsDoContato: [],
+    isOpen: false,
+    showDropdown: false,
+    initialized: false,
+    loading: true
+  };
+
+  function getContextFromURL() {
+    const path = window.location.pathname;
+    const account = path.match(/accounts\/(\d+)/);
+    const conversation = path.match(/conversations\/(\d+)/);
+    return {
+      account_id: account?.[1] || null,
+      conversation_id: conversation?.[1] || null
+    };
+  }
+
+  async function buscarLabels() {
+    try {
+      const url = `${API_URL}/accounts/${state.accountId}/labels`;
+      const response = await fetch(url, {
+        headers: { 'api_access_token': API_TOKEN }
+      });
+      
+      if (!response.ok) {
+        state.labels = [];
+        return;
+      }
+      
+      const data = await response.json();
+      state.labels = (data.payload || data || []).map(l => ({
+        title: l.title || l.name || '',
+        color: l.color || '#1f77b4'
+      }));
+      
+    } catch (error) {
+      state.labels = [];
+    }
+  }
+
+  async function buscarContactId() {
+    const path = window.location.pathname;
+    const contactMatch = path.match(/contacts\/(\d+)/);
+    
+    if (contactMatch) {
+      state.contactId = contactMatch[1];
+      return;
+    }
+
+    try {
+      const url = `${API_URL}/accounts/${state.accountId}/conversations/${state.conversationId}`;
+      const response = await fetch(url, {
+        headers: { 'api_access_token': API_TOKEN }
+      });
+      
+      const data = await response.json();
+      state.contactId = data.meta?.sender?.id || data.contact?.id || data.contact_id;
+      
+    } catch (error) {
+      console.error("Erro ao buscar contact ID");
+    }
+  }
+
+  async function buscarTagsDoContato() {
+    if (!state.contactId || !state.accountId) return [];
+    
+    try {
+      const url = `${API_URL}/accounts/${state.accountId}/contacts/${state.contactId}/labels`;
+      const response = await fetch(url, {
+        headers: { 'api_access_token': API_TOKEN }
+      });
+      
+      if (!response.ok) return [];
+      
+      const data = await response.json();
+      state.tagsDoContato = data.payload || data.labels || data || [];
+      return state.tagsDoContato;
+      
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async function adicionarTag(tag) {
+    try {
+      const novasTags = [...state.tagsDoContato, tag];
+      const url = `${API_URL}/accounts/${state.accountId}/contacts/${state.contactId}/labels`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api_access_token': API_TOKEN
+        },
+        body: JSON.stringify({ labels: novasTags })
+      });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      await buscarTagsDoContato();
+      renderConteudoAberto();
+      
+    } catch (error) {
+      console.error("Erro ao adicionar tag");
+    }
+  }
+
+  async function removerTag(tag) {
+    try {
+      const tagsAtualizadas = state.tagsDoContato.filter(t => t !== tag);
+      const url = `${API_URL}/accounts/${state.accountId}/contacts/${state.contactId}/labels`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api_access_token': API_TOKEN
+        },
+        body: JSON.stringify({ labels: tagsAtualizadas })
+      });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      await buscarTagsDoContato();
+      renderConteudoAberto();
+      
+    } catch (error) {
+      console.error("Erro ao remover tag");
+    }
+  }
+
+  function getCorLabel(nome) {
+    const label = state.labels.find(l => l.title === nome);
+    return label ? label.color : '#1f77b4';
+  }
+
+  function renderConteudoAberto() {
+    const container = document.getElementById('omniforge-tags-container');
+    if (!container) return;
+
+    if (state.loading) {
+      container.innerHTML = `
+        <div style="padding: 16px 0; text-align: center; color: #999;">
+          <p style="margin: 0;">Carregando etiquetas...</p>
+        </div>
+      `;
+      return;
+    }
+
+    const nomesDisponiveis = state.labels.map(l => l.title);
+    const tagsRestantes = nomesDisponiveis.filter(t => !state.tagsDoContato.includes(t));
+
+    container.innerHTML = `
+      <div style="padding: 16px 0;">
+        
+        <h6 style="color: #F1F1F1; font-size: 13px; font-weight: 500; margin: 0 0 12px 0;">
+          Etiquetas do contato
+        </h6>
+        
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+          
+          <button id="omniforge-add-btn" style="
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            color: #1f883d;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 0;
+          ">
+            <span style="font-size: 16px;">+</span>
+            <span>Adicionar etiquetas</span>
+          </button>
+          
+          ${state.tagsDoContato.map((tag) => {
+            const cor = getCorLabel(tag);
+            return `
+              <button 
+                class="omniforge-tag" 
+                onclick="window.OmniForgeRemoverTag('${tag}')"
+                style="outline-color: ${cor};"
+              >
+                <span class="omniforge-tag-dot" style="background: ${cor};"></span>
+                <span>${tag}</span>
+                <span class="omniforge-tag-x">×</span>
+              </button>
+            `;
+          }).join('')}
+          
+        </div>
+
+        <div id="omniforge-dropdown" style="
+          display: none;
+          margin-top: 12px;
+          background: #1D1E24;
+          border: 1px solid #2C2C2C;
+          border-radius: 8px;
+          padding: 8px;
+          max-height: 200px;
+          overflow-y: auto;
+        ">
+          <input 
+            type="text" 
+            id="omniforge-search" 
+            placeholder="Pesquisar etiquetas"
+            style="
+              width: 100%;
+              padding: 8px 12px;
+              background: #0A1014;
+              border: 1px solid #2C2C2C;
+              border-radius: 6px;
+              color: #F1F1F1;
+              font-size: 13px;
+              margin-bottom: 8px;
+              outline: none;
+            "
+          />
+          <div id="omniforge-tag-list"></div>
+        </div>
+
+      </div>
+    `;
+
+    const addBtn = document.getElementById('omniforge-add-btn');
+    const dropdown = document.getElementById('omniforge-dropdown');
+    const searchInput = document.getElementById('omniforge-search');
+    const tagList = document.getElementById('omniforge-tag-list');
+
+    addBtn.onclick = () => {
+      state.showDropdown = !state.showDropdown;
+      dropdown.style.display = state.showDropdown ? 'block' : 'none';
+      
+      if (state.showDropdown) {
+        searchInput.value = '';
+        renderTagList(tagsRestantes);
+        searchInput.focus();
+      }
+    };
+
+    searchInput.oninput = (e) => {
+      const query = e.target.value.toLowerCase();
+      const filtradas = tagsRestantes.filter(t => t.toLowerCase().includes(query));
+      renderTagList(filtradas);
+    };
+
+    function renderTagList(tags) {
+      tagList.innerHTML = tags.map(tag => `
+        <div onclick="window.OmniForgeAdicionarTag('${tag}')" style="
+          padding: 8px 12px;
+          color: #F1F1F1;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 4px;
+        " onmouseover="this.style.background='#2C2C2C'" onmouseout="this.style.background='transparent'">
+          ${tag}
+        </div>
+      `).join('');
+    }
+
+    window.OmniForgeAdicionarTag = async (tag) => {
+      await adicionarTag(tag);
+      state.showDropdown = false;
+    };
+  }
+
+  function injetarAcordeao() {
+    const acoesConversa = Array.from(document.querySelectorAll('h5')).find(h => 
+      h.textContent.trim() === 'Ações da conversa'
+    );
+    
+    if (!acoesConversa) return;
+    if (document.getElementById('omniforge-tags-wrapper')) return;
+
+    const wrapperTags = document.createElement('div');
+    wrapperTags.id = 'omniforge-tags-wrapper';
+    wrapperTags.style.marginTop = '16px';
+
+    const acordeaoTags = document.createElement('button');
+    acordeaoTags.id = 'omniforge-tags-acordeao';
+    acordeaoTags.className = 'flex items-center select-none w-full rounded-lg bg-n-solid-2 outline outline-1 outline-n-weak m-0 cursor-grab justify-between py-2 px-4 drag-handle';
+    acordeaoTags.innerHTML = `
+      <div class="flex justify-between">
+        <h5 class="text-n-slate-12 text-sm mb-0 py-0 pr-2 pl-0">Ações do Contato</h5>
+      </div>
+      <div class="flex flex-row">
+        <div class="flex justify-end w-3 text-n-blue-text cursor-pointer">
+          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11.883 3.007 12 3a1 1 0 0 1 .993.883L13 4v7h7a1 1 0 0 1 .993.883L21 12a1 1 0 0 1-.883.993L20 13h-7v7a1 1 0 0 1-.883.993L12 21a1 1 0 0 1-.993-.883L11 20v-7H4a1 1 0 0 1-.993-.883L3 12a1 1 0 0 1 .883-.993L4 11h7V4a1 1 0 0 1 .883-.993L12 3l-.117.007Z" fill="currentColor"></path>
+          </svg>
+        </div>
+      </div>
+    `;
+
+    const containerTags = document.createElement('div');
+    containerTags.id = 'omniforge-tags-container';
+    containerTags.style.display = 'none';
+    containerTags.style.padding = '0 16px';
+
+    wrapperTags.appendChild(acordeaoTags);
+    wrapperTags.appendChild(containerTags);
+
+    const acoesConversaBotao = acoesConversa.closest('button');
+    const acoesConversaPai = acoesConversaBotao.parentElement;
+    
+    acoesConversaPai.parentElement.insertBefore(wrapperTags, acoesConversaPai.nextSibling);
+
+    acordeaoTags.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      state.isOpen = !state.isOpen;
+      
+      if (state.isOpen) {
+        containerTags.style.display = 'block';
+        renderConteudoAberto();
+      } else {
+        containerTags.style.display = 'none';
+      }
+      
+      const icon = acordeaoTags.querySelector('svg path');
+      if (icon) {
+        if (state.isOpen) {
+          icon.setAttribute('d', 'M3.997 13H20a1 1 0 1 0 0-2H3.997a1 1 0 1 0 0 2Z');
+        } else {
+          icon.setAttribute('d', 'M11.883 3.007 12 3a1 1 0 0 1 .993.883L13 4v7h7a1 1 0 0 1 .993.883L21 12a1 1 0 0 1-.883.993L20 13h-7v7a1 1 0 0 1-.883.993L12 21a1 1 0 0 1-.993-.883L11 20v-7H4a1 1 0 0 1-.993-.883L3 12a1 1 0 0 1 .883-.993L4 11h7V4a1 1 0 0 1 .883-.993L12 3l-.117.007Z');
+        }
+      }
+    };
+  }
+
+  async function init() {
+    if (state.initialized) return;
+    state.initialized = true;
+
+    const context = getContextFromURL();
+    if (!context.account_id || !context.conversation_id) {
+      state.initialized = false;
+      return;
+    }
+
+    state.accountId = context.account_id;
+    state.conversationId = context.conversation_id;
+
+    injetarAcordeao();
+
+    state.loading = true;
+    await buscarContactId();
+    await buscarLabels();
+    await buscarTagsDoContato();
+    state.loading = false;
+
+    if (state.isOpen) {
+      renderConteudoAberto();
+    }
+  }
+
+  window.OmniForgeRemoverTag = async (tag) => {
+    await removerTag(tag);
+  };
+
+  const observer = new MutationObserver(() => {
+    const acoesConversa = Array.from(document.querySelectorAll('h5')).find(h => 
+      h.textContent.trim() === 'Ações da conversa'
+    );
+    
+    if (acoesConversa && !document.getElementById('omniforge-tags-wrapper')) {
+      init();
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  console.log("✅ OmniForge - Tags de Contato");
+
+})();
+</script>
