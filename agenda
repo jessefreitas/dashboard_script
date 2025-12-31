@@ -1,0 +1,132 @@
+<script>
+(function () {
+  const APP_ID = "omniforge-agendamento-panel";
+  const IFRAME_URL = "https://webhook.skycracker.com.br/webhook/agendamento-iniciar";
+  const BUTTON_TITLE = "Agendar";
+  const BUTTON_ICON = "📅";
+
+  function getContextFromURL() {
+    const path = window.location.pathname;
+    const accountMatch = path.match(/accounts\/(\d+)/);
+    const conversationMatch = path.match(/conversations\/(\d+)/);
+
+    return {
+      account_id: accountMatch ? accountMatch[1] : null,
+      conversation_id: conversationMatch ? conversationMatch[1] : null
+    };
+  }
+
+  function closePanel() {
+    const panel = document.getElementById(APP_ID);
+    if (!panel) return;
+
+    panel.style.display = "none";
+
+    const iframe = document.getElementById(`${APP_ID}-iframe`);
+    if (iframe) iframe.src = "about:blank";
+  }
+
+  function ensureSidePanel() {
+    if (document.getElementById(APP_ID)) return;
+
+    const panel = document.createElement("div");
+    panel.id = APP_ID;
+
+    Object.assign(panel.style, {
+      position: "fixed",
+      top: "0",
+      right: "0",
+      width: "440px",
+      height: "100vh",
+      background: "var(--color-background, #0B1117)",
+      borderLeft: "1px solid #1E293B",
+      zIndex: "9999",
+      display: "none",
+      boxShadow: "-4px 0 12px rgba(0,0,0,.4)"
+    });
+
+    panel.innerHTML = `
+      <div style="
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        padding:12px 14px;
+        border-bottom:1px solid #1E293B;
+        font-size:14px;
+        color:#E5E7EB;
+      ">
+        <strong>Novo Agendamento</strong>
+        <button id="${APP_ID}-close"
+          style="background:none;border:none;font-size:18px;cursor:pointer;color:#94A3B8;">
+          ✕
+        </button>
+      </div>
+
+      <iframe
+        id="${APP_ID}-iframe"
+        style="width:100%;height:calc(100% - 48px);border:none;"
+        src="about:blank">
+      </iframe>
+    `;
+
+    document.body.appendChild(panel);
+    document.getElementById(`${APP_ID}-close`).onclick = closePanel;
+  }
+
+  function openPanel() {
+    const { account_id, conversation_id } = getContextFromURL();
+    if (!account_id || !conversation_id) return;
+
+    const iframe = document.getElementById(`${APP_ID}-iframe`);
+    iframe.src =
+      `${IFRAME_URL}` +
+      `?account_id=${encodeURIComponent(account_id)}` +
+      `&conversation_id=${encodeURIComponent(conversation_id)}`;
+
+    document.getElementById(APP_ID).style.display = "block";
+  }
+
+  /* ================================
+     ÚNICA ALTERAÇÃO: LOCAL DO BOTÃO
+  ================================= */
+  function injectButton() {
+    const leftWrap = document.querySelector("div.left-wrap");
+    if (!leftWrap) return;
+
+    if (leftWrap.querySelector(`[data-${APP_ID}]`)) return;
+
+    const refButton = leftWrap.querySelector("button");
+    if (!refButton) return;
+
+    const btn = document.createElement("button");
+    btn.setAttribute(`data-${APP_ID}`, "true");
+    btn.title = BUTTON_TITLE;
+    btn.className = refButton.className;
+    btn.innerHTML = `<span>${BUTTON_ICON}</span>`;
+    btn.onclick = openPanel;
+
+    // entra exatamente ao lado do botão do agente
+    leftWrap.appendChild(btn);
+  }
+
+  // ESC fecha
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closePanel();
+  });
+
+  // Fechamento vindo do iframe
+  window.addEventListener("message", (event) => {
+    if (event?.data?.type === "OMNIFORGE_CLOSE_PANEL") {
+      closePanel();
+    }
+  });
+
+  ensureSidePanel();
+  injectButton();
+
+  new MutationObserver(() => {
+    ensureSidePanel();
+    injectButton();
+  }).observe(document.body, { childList: true, subtree: true });
+})();
+</script>
