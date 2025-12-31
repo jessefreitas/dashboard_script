@@ -1,0 +1,940 @@
+<script>
+(function() {
+  'use strict';
+
+  // ============================================================
+  // CONFIGURAÇÃO
+  // ============================================================
+  
+  const CONFIG = {
+    webhookUrl: 'https://webhook.skycracker.com.br/webhook/buscar_historico_cliente',
+    sentimentoWebhookUrl: 'https://webhook.skycracker.com.br/webhook/sentimento_clientes',
+    panelId: 'omniforge-client-panel',
+    buttonAttr: 'data-omniforge-btn',
+    panelWidth: '450px',
+    autoLoadOnOpen: true,
+    cacheData: false
+  };
+
+  // ============================================================
+  // CORES MEGA DARK MODE
+  // ============================================================
+  
+  const COLORS = {
+    bg: '#0A1014',
+    card: '#1D1E24',
+    border: '#2C2C2C',
+    text: '#FCFCFC',
+    muted: '#83878A',
+    primary: '#22c55e',
+    primaryHover: '#16a34a',
+    purple: '#a855f7',
+    blue: '#3b82f6',
+    orange: '#f97316',
+    red: '#ef4444'
+  };
+
+  // ============================================================
+  // ÍCONES SVG
+  // ============================================================
+  
+  const ICONS = {
+    button1: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
+      <path d="M104,60H56A16,16,0,0,0,40,76v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V76A16,16,0,0,0,104,60Zm0,64H56V76h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V76A16,16,0,0,0,200,60Zm0,64H152V76h48v48ZM104,156H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V172A16,16,0,0,0,104,156Zm0,64H56V172h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V172A16,16,0,0,0,200,156Zm0,64H152V172h48v48Z"></path>
+    </svg>`,
+    
+    button2: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
+      <path d="M224,177.32l-46.21-28.13a44,44,0,1,0-43.58,0L88,177.32A15.93,15.93,0,0,0,80,191.07V232a16,16,0,0,0,16,16H160a16,16,0,0,0,16-16V191.07A15.93,15.93,0,0,0,224,177.32ZM112,112a28,28,0,1,1,28,28A28,28,0,0,1,112,112Zm48,120H96V192h64Zm64-136a8,8,0,0,1-8,8H192v16a8,8,0,0,1-16,0V104H160a8,8,0,0,1,0-16h16V72a8,8,0,0,1,16,0V88h16A8,8,0,0,1,224,96ZM56,96v16a8,8,0,0,1-16,0V96H24a8,8,0,0,1,0-16H40V64a8,8,0,0,1,16,0V80H72a8,8,0,0,1,0,16Z"></path>
+    </svg>`,
+    
+    button3: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
+      <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm40-68a28,28,0,0,1-28,28h-4v8a8,8,0,0,1-16,0v-8H104a8,8,0,0,1,0-16h36a12,12,0,0,0,0-24H116a28,28,0,0,1,0-56h4V72a8,8,0,0,1,16,0v8h16a8,8,0,0,1,0,16H116a12,12,0,0,0,0,24h24A28,28,0,0,1,168,148Z"></path>
+    </svg>`,
+    
+    button4: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
+      <path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V96H40V56ZM40,200V112H216v88Z"></path>
+    </svg>`
+  };
+
+  // ============================================================
+  // ESTADO GLOBAL
+  // ============================================================
+  
+  let state = {
+    clientData: null,
+    sentimentoData: null,
+    isLoading: false,
+    isOpen: false,
+    currentView: 'perfil'
+  };
+
+  // ============================================================
+  // UTILIDADES
+  // ============================================================
+  
+  const utils = {
+    getContext: function() {
+      const path = window.location.pathname;
+      const accountMatch = path.match(/accounts\/(\d+)/);
+      const conversationMatch = path.match(/conversations\/(\d+)/);
+      
+      let contact_id = null;
+      
+      const contactProfileMatch = path.match(/contacts\/(\d+)/);
+      if (contactProfileMatch) {
+        contact_id = contactProfileMatch[1];
+      }
+      
+      if (!contact_id) {
+        const contactElement = document.querySelector('[data-contact-id]');
+        if (contactElement) {
+          contact_id = contactElement.getAttribute('data-contact-id');
+        }
+      }
+      
+      if (!contact_id) {
+        const panels = document.querySelectorAll('[class*="panel"], [class*="sidebar"]');
+        panels.forEach(panel => {
+          const text = panel.textContent;
+          const match = text.match(/ID[:\s]*(\d+)/i);
+          if (match && match[1]) {
+            contact_id = match[1];
+          }
+        });
+      }
+      
+      return {
+        account_id: accountMatch ? accountMatch[1] : null,
+        conversation_id: conversationMatch ? conversationMatch[1] : null,
+        contact_id: contact_id
+      };
+    },
+
+    formatDate: function(isoDate) {
+      if (!isoDate) return '-';
+      const date = new Date(isoDate);
+      return date.toLocaleDateString('pt-BR', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    },
+
+    calcDays: function(startDate) {
+      if (!startDate) return 0;
+      const start = new Date(startDate);
+      const now = new Date();
+      const diff = now - start;
+      return Math.floor(diff / (1000 * 60 * 60 * 24));
+    },
+
+    getInitials: function(name) {
+      if (!name) return '?';
+      const parts = name.trim().split(' ');
+      if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+      return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    },
+
+    log: function(emoji, ...args) {
+      console.log(`${emoji} [OmniForge]`, ...args);
+    }
+  };
+
+  // ============================================================
+  // API
+  // ============================================================
+  
+  const api = {
+    fetchClientData: async function() {
+      if (state.isLoading) return;
+      
+      const context = utils.getContext();
+      
+      if (!context.account_id) {
+        ui.showError('Account ID não encontrado na URL');
+        return null;
+      }
+
+      const body = { account_id: context.account_id };
+      
+      if (context.contact_id) {
+        body.contact_id = context.contact_id;
+      } else if (context.conversation_id) {
+        body.conversation_id = context.conversation_id;
+      } else {
+        ui.showError('IDs não encontrados. Abra uma conversa primeiro.');
+        return null;
+      }
+
+      try {
+        state.isLoading = true;
+        ui.showLoading();
+        
+        const response = await fetch(CONFIG.webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) throw new Error(`Erro ${response.status}`);
+
+        const data = await response.json();
+        state.clientData = data;
+        ui.showSuccess();
+        
+      } catch (error) {
+        ui.showError(error.message);
+      } finally {
+        state.isLoading = false;
+      }
+    },
+
+    fetchSentimento: async function() {
+      const context = utils.getContext();
+      
+      if (!context.account_id || !context.conversation_id) {
+        ui.showError('Abra uma conversa primeiro');
+        return null;
+      }
+
+      const body = { 
+        account_id: context.account_id,
+        conversation_id: context.conversation_id
+      };
+
+      try {
+        state.isLoading = true;
+        ui.showLoading();
+        
+        const response = await fetch(CONFIG.sentimentoWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) throw new Error(`Erro ${response.status}`);
+
+        const data = await response.json();
+        state.sentimentoData = data;
+        ui.showTemperatura();
+        
+      } catch (error) {
+        ui.showError(error.message);
+      } finally {
+        state.isLoading = false;
+      }
+    }
+  };
+
+  // ============================================================
+  // UI
+  // ============================================================
+  
+  const ui = {
+    createPanel: function() {
+      if (document.getElementById(CONFIG.panelId)) return;
+
+      const backdrop = document.createElement('div');
+      backdrop.id = `${CONFIG.panelId}-backdrop`;
+      backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 99998;
+        display: none;
+        backdrop-filter: blur(2px);
+        transition: opacity 0.3s;
+      `;
+      backdrop.onclick = () => this.closePanel();
+      document.body.appendChild(backdrop);
+
+      const panel = document.createElement('div');
+      panel.id = CONFIG.panelId;
+      panel.style.cssText = `
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: ${CONFIG.panelWidth};
+        height: 100vh;
+        background: ${COLORS.bg};
+        border-left: 1px solid ${COLORS.border};
+        z-index: 99999;
+        display: none;
+        flex-direction: column;
+        box-shadow: -4px 0 12px rgba(0,0,0,0.5);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+      `;
+
+      panel.innerHTML = `
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-bottom: 1px solid ${COLORS.border};
+          background: ${COLORS.card};
+        ">
+          <div style="display: flex; gap: 12px; align-items: center; flex: 1;">
+            <button id="${CONFIG.panelId}-tab-perfil" class="panel-tab" style="
+              background: ${COLORS.primary};
+              color: ${COLORS.bg};
+              border: none;
+              padding: 8px 16px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 13px;
+              transition: all 0.2s;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            ">
+              <span>📊</span> Perfil
+            </button>
+            <button id="${CONFIG.panelId}-tab-temperatura" class="panel-tab" style="
+              background: transparent;
+              color: ${COLORS.text};
+              border: 1px solid ${COLORS.border};
+              padding: 8px 16px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 13px;
+              transition: all 0.2s;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            ">
+              <span>🔥</span> Temperatura
+            </button>
+          </div>
+          <button id="${CONFIG.panelId}-close" style="
+            background: none;
+            border: none;
+            color: ${COLORS.muted};
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
+          ">×</button>
+        </div>
+        
+        <div id="${CONFIG.panelId}-content" style="
+          flex: 1;
+          overflow-y: auto;
+          padding: 20px;
+        "></div>
+      `;
+
+      document.body.appendChild(panel);
+
+      document.getElementById(`${CONFIG.panelId}-close`).onclick = () => this.closePanel();
+      document.getElementById(`${CONFIG.panelId}-tab-perfil`).onclick = () => this.switchView('perfil');
+      document.getElementById(`${CONFIG.panelId}-tab-temperatura`).onclick = () => this.switchView('temperatura');
+      
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && state.isOpen) this.closePanel();
+      });
+    },
+
+    switchView: function(view) {
+      state.currentView = view;
+      
+      const tabPerfil = document.getElementById(`${CONFIG.panelId}-tab-perfil`);
+      const tabTemperatura = document.getElementById(`${CONFIG.panelId}-tab-temperatura`);
+      
+      if (view === 'perfil') {
+        tabPerfil.style.background = COLORS.primary;
+        tabPerfil.style.color = COLORS.bg;
+        tabPerfil.style.border = 'none';
+        
+        tabTemperatura.style.background = 'transparent';
+        tabTemperatura.style.color = COLORS.text;
+        tabTemperatura.style.border = `1px solid ${COLORS.border}`;
+        
+        if (!CONFIG.cacheData || !state.clientData) {
+          api.fetchClientData();
+        } else {
+          this.showSuccess();
+        }
+      } else {
+        tabTemperatura.style.background = COLORS.primary;
+        tabTemperatura.style.color = COLORS.bg;
+        tabTemperatura.style.border = 'none';
+        
+        tabPerfil.style.background = 'transparent';
+        tabPerfil.style.color = COLORS.text;
+        tabPerfil.style.border = `1px solid ${COLORS.border}`;
+        
+        api.fetchSentimento();
+      }
+    },
+
+    openPanel: function(view = 'perfil') {
+      ui.createPanel();
+      const panel = document.getElementById(CONFIG.panelId);
+      const backdrop = document.getElementById(`${CONFIG.panelId}-backdrop`);
+      
+      backdrop.style.display = 'block';
+      panel.style.display = 'flex';
+      
+      setTimeout(() => {
+        panel.style.transform = 'translateX(0)';
+      }, 10);
+      
+      state.isOpen = true;
+      this.switchView(view);
+    },
+
+    closePanel: function() {
+      const panel = document.getElementById(CONFIG.panelId);
+      const backdrop = document.getElementById(`${CONFIG.panelId}-backdrop`);
+      
+      if (panel) {
+        panel.style.transform = 'translateX(100%)';
+        
+        setTimeout(() => {
+          panel.style.display = 'none';
+          if (backdrop) backdrop.style.display = 'none';
+        }, 300);
+        
+        state.isOpen = false;
+      }
+    },
+
+    showLoading: function() {
+      const content = document.getElementById(`${CONFIG.panelId}-content`);
+      if (!content) return;
+
+      content.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: ${COLORS.muted};">
+          <div style="text-align: center;">
+            <div style="font-size: 64px; margin-bottom: 16px; animation: pulse 1.5s ease-in-out infinite;">⏳</div>
+            <div style="font-size: 16px; font-weight: 500;">Carregando dados...</div>
+          </div>
+        </div>
+        <style>
+          @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+          }
+        </style>
+      `;
+    },
+
+    showError: function(message) {
+      const content = document.getElementById(`${CONFIG.panelId}-content`);
+      if (!content) return;
+
+      content.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+          <div style="text-align: center; max-width: 300px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">❌</div>
+            <div style="font-size: 16px; color: ${COLORS.red}; margin-bottom: 8px; font-weight: 600;">
+              Erro ao carregar dados
+            </div>
+            <div style="font-size: 13px; color: ${COLORS.muted}; margin-bottom: 20px; line-height: 1.5;">
+              ${message}
+            </div>
+            <button onclick="window.OmniForge.reload()" style="
+              background: ${COLORS.primary};
+              color: ${COLORS.bg};
+              border: none;
+              padding: 12px 24px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 14px;
+              transition: all 0.2s;
+            ">
+              🔄 Tentar Novamente
+            </button>
+          </div>
+        </div>
+      `;
+    },
+
+    showSuccess: function() {
+      const content = document.getElementById(`${CONFIG.panelId}-content`);
+      if (!content || !state.clientData) return;
+
+      const cliente = state.clientData.cliente || state.clientData;
+      const interesses = cliente.interesses || {};
+      const dias = utils.calcDays(cliente.primeira_mensagem);
+      const iniciais = utils.getInitials(cliente.nome);
+
+      content.innerHTML = `
+        ${this.renderAvatar(iniciais, cliente.nome, dias)}
+        ${this.renderInterests(interesses)}
+        ${this.renderStats(cliente)}
+        ${this.renderContactInfo(cliente)}
+        ${this.renderActions()}
+      `;
+    },
+
+    showTemperatura: function() {
+      const content = document.getElementById(`${CONFIG.panelId}-content`);
+      if (!content || !state.sentimentoData) return;
+
+      const nivel = parseInt(state.sentimentoData.sentimento || state.sentimentoData.nivel || 3);
+      content.innerHTML = this.renderTemperaturaContent(nivel);
+    },
+
+    getSentimentoConfig: function(nivel) {
+      const configs = {
+        1: { cor: '#3b82f6', emoji: '🧊', label: 'FRIO', descricao: 'Cliente pouco engajado', orientacao: 'Aqueça o relacionamento com conteúdo de valor antes de oferecer produtos.' },
+        2: { cor: '#6366f1', emoji: '❄️', label: 'GELADO', descricao: 'Interesse baixo', orientacao: 'Faça perguntas para entender necessidades e criar rapport.' },
+        3: { cor: '#f59e0b', emoji: '🌡️', label: 'MORNO', descricao: 'Interesse moderado', orientacao: 'Cliente receptivo. Apresente soluções específicas para suas dores.' },
+        4: { cor: '#f97316', emoji: '🔥', label: 'QUENTE', descricao: 'Alta probabilidade de conversão', orientacao: 'Momento ideal! Apresente proposta comercial e negocie condições.' },
+        5: { cor: '#ef4444', emoji: '🚀', label: 'MUITO QUENTE', descricao: 'Cliente pronto para fechar', orientacao: 'FECHE AGORA! Cliente está pronto. Envie proposta e contrato imediatamente.' }
+      };
+      return configs[nivel] || configs[3];
+    },
+
+    renderTemperaturaContent: function(nivel) {
+      const config = this.getSentimentoConfig(nivel);
+      
+      return `
+        <div style="
+          background: linear-gradient(135deg, ${config.cor}20 0%, ${config.cor}10 100%);
+          border: 2px solid ${config.cor};
+          border-radius: 12px;
+          padding: 30px 24px;
+          text-align: center;
+          margin-bottom: 24px;
+        ">
+          <div style="font-size: 80px; margin-bottom: 16px; line-height: 1;">${config.emoji}</div>
+          <div style="font-size: 28px; font-weight: 700; color: ${config.cor}; margin-bottom: 8px;">
+            ${config.label}
+          </div>
+          <div style="font-size: 15px; color: ${COLORS.text}; opacity: 0.9;">
+            ${config.descricao}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+          <div style="font-size: 12px; color: ${COLORS.muted}; margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+            TEMPERATURA DA VENDA
+          </div>
+          <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+            ${[1,2,3,4,5].map(n => `
+              <div style="
+                flex: 1;
+                height: 10px;
+                background: ${n <= nivel ? this.getSentimentoConfig(n).cor : COLORS.border};
+                border-radius: 5px;
+                transition: all 0.3s;
+                ${n === nivel ? `box-shadow: 0 0 8px ${this.getSentimentoConfig(n).cor};` : ''}
+              "></div>
+            `).join('')}
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: ${COLORS.muted}; font-weight: 500;">
+            <span>1 (Frio)</span>
+            <span>5 (Quente)</span>
+          </div>
+        </div>
+
+        <div style="
+          background: ${COLORS.card};
+          border-left: 4px solid ${config.cor};
+          border-radius: 10px;
+          padding: 20px;
+          margin-bottom: 20px;
+        ">
+          <div style="font-size: 12px; color: ${config.cor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; font-weight: 700;">
+            💡 COMO ABORDAR
+          </div>
+          <div style="font-size: 14px; line-height: 1.7; color: ${COLORS.text};">
+            ${config.orientacao}
+          </div>
+        </div>
+      `;
+    },
+
+    renderAvatar: function(iniciais, nome, dias) {
+      return `
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 20px;
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
+          border-radius: 12px;
+          margin-bottom: 20px;
+        ">
+          <div style="
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, ${COLORS.primary}, ${COLORS.primaryHover});
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: ${COLORS.bg};
+            flex-shrink: 0;
+          ">${iniciais}</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0; font-size: 20px; color: ${COLORS.text}; font-weight: 600;">
+              ${nome || 'Cliente'}
+            </h2>
+            <div style="font-size: 13px; color: ${COLORS.muted}; margin-top: 4px;">
+              ${dias > 0 ? `Cliente há ${dias} dias` : 'Novo cliente'}
+            </div>
+          </div>
+        </div>
+      `;
+    },
+
+    renderInterests: function(interesses) {
+      if (!interesses.resumo) return '';
+
+      return `
+        <div style="
+          background: linear-gradient(135deg, ${COLORS.card} 0%, #1a1f2e 100%);
+          border: 1px solid ${COLORS.border};
+          border-left: 3px solid ${COLORS.purple};
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 20px;
+        ">
+          <h3 style="
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: ${COLORS.purple};
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+          ">
+            <span>🎯</span> Análise de Interesses
+          </h3>
+          
+          <p style="
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: ${COLORS.text};
+          ">${interesses.resumo}</p>
+        </div>
+      `;
+    },
+
+    renderStats: function(cliente) {
+      return `
+        <div style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-bottom: 20px;
+        ">
+          <div style="
+            background: ${COLORS.card};
+            border: 1px solid ${COLORS.border};
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+          ">
+            <div style="font-size: 28px; font-weight: 700; color: ${COLORS.primary};">
+              ${cliente.total_conversas || 0}
+            </div>
+            <div style="font-size: 12px; color: ${COLORS.muted}; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">
+              Conversas
+            </div>
+          </div>
+          
+          <div style="
+            background: ${COLORS.card};
+            border: 1px solid ${COLORS.border};
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+          ">
+            <div style="font-size: 28px; font-weight: 700; color: ${COLORS.primary};">
+              ${cliente.total_mensagens || 0}
+            </div>
+            <div style="font-size: 12px; color: ${COLORS.muted}; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">
+              Mensagens
+            </div>
+          </div>
+        </div>
+      `;
+    },
+
+    renderContactInfo: function(cliente) {
+      return `
+        <div style="
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 12px;
+        ">
+          <div style="font-size: 11px; color: ${COLORS.muted}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+            📧 E-mail
+          </div>
+          <div style="color: ${COLORS.text}; font-size: 14px;">
+            ${cliente.email || '-'}
+          </div>
+        </div>
+
+        <div style="
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
+          border-radius: 12px;
+          padding: 16px;
+        ">
+          <div style="font-size: 11px; color: ${COLORS.muted}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+            📱 Telefone
+          </div>
+          <div style="color: ${COLORS.text}; font-size: 14px;">
+            ${cliente.telefone || '-'}
+          </div>
+        </div>
+      `;
+    },
+
+    renderActions: function() {
+      return `
+        <div style="margin-top: 24px; text-align: center;">
+          <button onclick="window.OmniForge.reload()" style="
+            background: ${COLORS.card};
+            border: 1px solid ${COLORS.border};
+            color: ${COLORS.text};
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s;
+            width: 100%;
+          ">
+            🔄 Atualizar Dados
+          </button>
+        </div>
+      `;
+    }
+  };
+
+  // ============================================================
+  // INJETAR 4 BOTÕES
+  // ============================================================
+  
+  const button = {
+    inject: function() {
+      const userIcons = document.querySelectorAll('.i-ph-user-bold');
+
+      userIcons.forEach((icon) => {
+        const originalBtn = icon.closest('button');
+        if (!originalBtn) return;
+        
+        const container = originalBtn.parentElement;
+        if (!container) return;
+
+        if (container.querySelector(`[${CONFIG.buttonAttr}]`)) return;
+
+        const btn1 = originalBtn.cloneNode(true);
+        btn1.setAttribute(CONFIG.buttonAttr, 'true');
+        btn1.title = 'Dados do Cliente';
+        btn1.innerHTML = ICONS.button1;
+        const svg1 = btn1.querySelector('svg');
+        if (svg1) svg1.classList.add('flex-shrink-0');
+        btn1.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          ui.openPanel('perfil');
+        };
+        container.appendChild(btn1);
+
+        const btn2 = originalBtn.cloneNode(true);
+        btn2.setAttribute(CONFIG.buttonAttr, 'true');
+        btn2.title = 'Temperatura';
+        btn2.innerHTML = ICONS.button2;
+        const svg2 = btn2.querySelector('svg');
+        if (svg2) svg2.classList.add('flex-shrink-0');
+        btn2.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          ui.openPanel('temperatura');
+        };
+        container.appendChild(btn2);
+
+        const btn3 = originalBtn.cloneNode(true);
+        btn3.setAttribute(CONFIG.buttonAttr, 'true');
+        btn3.title = 'Financeiro';
+        btn3.innerHTML = ICONS.button3;
+        const svg3 = btn3.querySelector('svg');
+        if (svg3) svg3.classList.add('flex-shrink-0');
+        btn3.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🟡 Botão 3 clicado!');
+        };
+        container.appendChild(btn3);
+
+        const btn4 = originalBtn.cloneNode(true);
+        btn4.setAttribute(CONFIG.buttonAttr, 'true');
+        btn4.title = 'Cartão';
+        btn4.innerHTML = ICONS.button4;
+        const svg4 = btn4.querySelector('svg');
+        if (svg4) svg4.classList.add('flex-shrink-0');
+        btn4.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🟢 Botão 4 clicado!');
+        };
+        container.appendChild(btn4);
+      });
+    }
+  };
+
+  // ============================================================
+  // TOGGLE DE CONTATOS
+  // ============================================================
+  
+  const toggleContatos = {
+    encontrarPainel: function() {
+      const todos = document.querySelectorAll('*');
+      for (const el of todos) {
+        const texto = (el.textContent || '').trim();
+        if (texto.startsWith('Contatos')) {
+          const rect = el.getBoundingClientRect();
+          if (rect.width > 200 && rect.height > 300) {
+            return el;
+          }
+        }
+      }
+      return null;
+    },
+
+    encontrarBotaoFechar: function() {
+      const painel = this.encontrarPainel();
+      if (!painel) return null;
+
+      const iconeX = painel.querySelector('.i-lucide-x');
+      if (iconeX) {
+        const botao = iconeX.closest('button');
+        if (botao) return botao;
+      }
+
+      const iconesFechar = painel.querySelectorAll('[class*="x"], [class*="close"], [class*="times"]');
+      for (const icone of iconesFechar) {
+        const botao = icone.closest('button');
+        if (botao) return botao;
+      }
+
+      const botoes = painel.querySelectorAll('button');
+      for (const btn of botoes) {
+        const texto = btn.textContent.trim();
+        if (texto === '×' || texto === 'X' || texto === 'x') return btn;
+      }
+
+      return null;
+    },
+
+    fecharPainel: function() {
+      const botaoX = this.encontrarBotaoFechar();
+      if (botaoX) {
+        botaoX.click();
+        return true;
+      }
+      return false;
+    },
+
+    instalar: function() {
+      const iconeUsuario = document.querySelector('.i-ph-user-bold');
+      if (!iconeUsuario) return;
+
+      const botao = iconeUsuario.closest('button');
+      if (!botao || botao.dataset.toggleInstalado === 'true') return;
+
+      botao.dataset.toggleInstalado = 'true';
+      console.log('✅ Toggle de contatos instalado');
+
+      botao.addEventListener('click', (evento) => {
+        const painelAberto = toggleContatos.encontrarPainel();
+        if (painelAberto) {
+          console.log('🔴 Fechando painel de contatos');
+          evento.preventDefault();
+          evento.stopPropagation();
+          evento.stopImmediatePropagation();
+          toggleContatos.fecharPainel();
+          return false;
+        }
+      }, true);
+    }
+  };
+
+  // ============================================================
+  // INICIALIZAÇÃO
+  // ============================================================
+  
+  function init() {
+    utils.log('🚀', 'Iniciando OmniForge + Toggle...');
+    
+    ui.createPanel();
+    button.inject();
+    toggleContatos.instalar();
+
+    const observer = new MutationObserver(() => {
+      button.inject();
+      toggleContatos.instalar();
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    utils.log('✅', 'Sistema iniciado!');
+  }
+
+  // ============================================================
+  // API PÚBLICA
+  // ============================================================
+  
+  window.OmniForge = {
+    open: function(view = 'perfil') {
+      ui.openPanel(view);
+    },
+    close: ui.closePanel,
+    reload: function() {
+      state.clientData = null;
+      state.sentimentoData = null;
+      if (state.currentView === 'perfil') {
+        api.fetchClientData();
+      } else {
+        api.fetchSentimento();
+      }
+    },
+    getState: function() {
+      return { ...state };
+    }
+  };
+
+  // ============================================================
+  // START
+  // ============================================================
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
+</script>
