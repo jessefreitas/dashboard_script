@@ -1,0 +1,517 @@
+<script>
+  /*****************
+   * Configuração de Rotação de Mensagens
+   *****************/
+  const heroMessages = [
+    {
+      title: "Automação de <span class='text-highlight'>Elite</span>",
+      description: "Escale sua operação sem aumentar a equipe. Nossos fluxos de automação eliminam tarefas repetitivas e garantem eficiência máxima."
+    },
+    {
+      title: "Controle Total com <span class='text-highlight'>Dashboards</span>",
+      description: "Tome decisões baseadas em dados. Visualize métricas vitais em tempo real e acompanhe o desempenho do seu negócio numa única tela."
+    },
+    {
+      title: "Scripts e Integração <span class='text-highlight'>Omniforge</span>",
+      description: "Personalização sem limites. Utilize scripts avançados e integrações robustas para adaptar a plataforma exatamente à sua necessidade."
+    },
+    {
+      title: "Infraestrutura <span class='text-highlight'>Blindada</span>",
+      description: "Segurança e alta disponibilidade. Sua operação rodando em servidores otimizados com monitoramento constante e proteção de dados."
+    }
+  ];
+ 
+  // Seleciona uma mensagem aleatória
+  const selectedMessage = heroMessages[Math.floor(Math.random() * heroMessages.length)];
+ 
+  /*****************
+   * Configuração de Textos (Login)
+   *****************/
+  const loginPreTitle = "ACESSE SUA CONTA";
+  const loginTitle = "Bem-vindo!";
+  const loginSubtitle = "Entre com suas credenciais para continuar";
+  const labelEmail = "E-mail";
+  const placeholderEmail = "Digite seu e-mail";
+  const labelPassword = "Senha";
+  const placeholderPassword = "Digite sua senha";
+  const linkForgotPassword = "Esqueceu a senha?";
+  const buttonText = "ENTRAR";
+  const dividerText = "OU";
+  const footerText = "Não tem uma conta?";
+  const footerLinkText = "CRIE SUA CONTA AGORA";
+  const removeSSO = true;
+ 
+  const leftSideBrandSlogan = "";
+ 
+  const leftSideFeatures = [
+    { icon: "⚡", text: "Alta Performance" },
+    { icon: "🚀", text: "Automação Total" },
+    { icon: "🛡️", text: "Segurança Avançada" },
+    { icon: "💎", text: "Suporte Premium" }
+  ];
+ 
+  /*****************
+   * Configuração Técnica
+   *****************/
+  const isLoginPage = window.location.pathname.includes("/app/login");
+ 
+  // ==================================================================
+  // TASKS DE LOGIN
+  // ==================================================================
+  const tasksLogin = [{
+      name: "rebuildLeftContent",
+      selector: "main > section:first-child",
+      action: elemento => {
+        if (elemento.hasAttribute("data-custom-injected")) return;
+ 
+        const featuresHTML = leftSideFeatures
+          .map(
+            feature => `
+    <div class="feature-card">
+        <div class="feature-icon-box">${feature.icon}</div>
+        <span class="feature-text">${feature.text}</span>
+    </div>`
+          )
+          .join("");
+ 
+        const leftSideHTML = `
+    <div class="custom-wrapper">
+        <div class="header-row">
+            <div class="logo-area">
+                <div class="logo-brand">🚀</div>
+                <div class="brand-text">
+                    <span class="brand-name">Omniforge</span>
+                    <span class="brand-slogan">${leftSideBrandSlogan}</span>
+                </div>
+            </div>
+        </div>
+        <div class="content-block">
+            <h2 class="content-title">${selectedMessage.title}</h2>
+            <p class="content-description">${selectedMessage.description}</p>
+            <div class="content-features-grid">${featuresHTML}</div>
+        </div>
+    </div>`;
+ 
+        elemento.innerHTML = leftSideHTML;
+        elemento.setAttribute("data-custom-injected", "true");
+      },
+      done: false
+    },
+    {
+      name: "augmentRightForm",
+      selector: "main > section:last-child > div",
+      action: elemento => {
+        if (elemento.hasAttribute("data-custom-injected")) return;
+ 
+        const form = elemento.querySelector("form");
+        if (!form) return;
+ 
+        const formHeader = document.createElement("div");
+        formHeader.className = "form-header";
+        formHeader.innerHTML = `
+    <div class="form-pretitle">${loginPreTitle}</div>
+    <h2 class="form-title">${loginTitle}</h2>
+    <p class="form-subtitle">${loginSubtitle}</p>`;
+ 
+        const oldTitle = elemento.querySelector("h3");
+        const oldSubtitle = elemento.querySelector("p");
+        if (oldTitle) oldTitle.remove();
+        if (oldSubtitle) oldSubtitle.remove();
+        elemento.prepend(formHeader);
+ 
+        const divider = document.createElement("div");
+        divider.className = "divider";
+        divider.innerHTML = `<span>${dividerText}</span>`;
+        form.insertAdjacentElement("afterend", divider);
+ 
+        const footer = document.createElement("div");
+        footer.className = "form-footer";
+        footer.innerHTML = `
+    <span class="footer-question">${footerText}</span>
+    <a href="#" class="footer-cta">${footerLinkText}</a>`;
+        divider.insertAdjacentElement("afterend", footer);
+ 
+        elemento.setAttribute("data-custom-injected", "true");
+      },
+      done: false
+    },
+    {
+      name: "updateFormLabels",
+      selector: "form",
+      action: form => {
+        const emailLabel = form.querySelector('label[for="email_address"]');
+        const emailInput = form.querySelector('input[id="email_address"]');
+        if (emailLabel) emailLabel.innerHTML = labelEmail;
+        if (emailInput) {
+          emailInput.placeholder = placeholderEmail;
+          emailInput.type = "text";
+        }
+ 
+        const passLabel = form.querySelector('label[for="password"]');
+        const passInput = form.querySelector('input[id="password"]');
+ 
+        if (passLabel) {
+          const link = passLabel.querySelector("a");
+          if (link) {
+            link.innerHTML = linkForgotPassword;
+            passLabel.innerHTML = `${labelPassword} ${link.outerHTML}`;
+          } else {
+            passLabel.innerHTML = labelPassword;
+          }
+        }
+ 
+        if (passInput) passInput.placeholder = placeholderPassword;
+ 
+        const button = form.querySelector('button[type="submit"]');
+        if (button) button.innerHTML = buttonText;
+      },
+      done: false
+    },
+    removeSSO && {
+      name: "removeSSO",
+      selector: 'a[href="/app/login/sso"]',
+      action: elemento => elemento.closest(".flex.flex-col")?.remove(),
+      done: false
+    }
+  ].filter(Boolean);
+ 
+  // Executa apenas se estiver na tela de login
+  if (isLoginPage) {
+    const bodyObserver = new MutationObserver(() => {
+      tasksLogin.forEach(task => {
+        if (!task.done) {
+          const elemento = document.querySelector(task.selector);
+          if (elemento) {
+            task.action(elemento);
+            task.done = true;
+          }
+        }
+      });
+    });
+    bodyObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+ 
+    // ==================================================================
+    // CSS LOGIN + WIDGET AZUL GLASS
+    // ==================================================================
+    const loginCSS = `
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #050505 !important;
+  box-sizing: border-box !important;
+}
+ 
+::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+::-webkit-scrollbar-track { background: #050505 !important; }
+::-webkit-scrollbar-thumb {
+  background: #333 !important;
+  border-radius: 4px !important;
+}
+::-webkit-scrollbar-thumb:hover { background: #3B82F6 !important; }
+ 
+.flex.min-h-screen,
+.login-box,
+main {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  min-height: 100vh !important;
+  height: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background:
+    radial-gradient(circle at top left, rgba(59,130,246,0.15), transparent 40%),
+    radial-gradient(circle at bottom right, rgba(6,182,212,0.15), transparent 40%),
+    #050505 !important;
+  background-size: 100% 100% !important;
+  box-sizing: border-box !important;
+}
+ 
+main::before,
+main::after,
+.flex.min-h-screen::before,
+.flex.min-h-screen::after { display: none !important; }
+ 
+main > section:first-child {
+  width: 50% !important;
+  min-width: 320px !important;
+  background: none !important;
+  position: relative !important;
+  z-index: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  padding: 0 40px !important;
+  box-sizing: border-box !important;
+}
+ 
+main > section:first-child img { display: none !important; }
+ 
+.custom-wrapper {
+  max-width: 600px !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  text-align: left !important;
+  margin-left: auto !important;
+  box-sizing: border-box !important;
+}
+ 
+.header-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  margin-bottom: 80px !important;
+  width: 100% !important;
+}
+ 
+.logo-area { display: flex !important; align-items: center !important; gap: 14px !important; }
+ 
+.logo-brand {
+  width: 56px !important;
+  height: 56px !important;
+  background: linear-gradient(135deg,#3B82F6,#06B6D4) !important;
+  border-radius: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 30px !important;
+  color: white !important;
+  box-shadow: 0 0 30px rgba(59,130,246,0.5) !important;
+}
+ 
+.brand-name { color: #fff !important; font-size: 28px !important; font-weight: 900 !important; display: block !important; }
+ 
+.brand-slogan {
+  background: linear-gradient(135deg,#3B82F6,#06B6D4) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+}
+ 
+.content-block { display: flex !important; flex-direction: column !important; justify-content: center !important; }
+ 
+.content-title {
+  color: #fff !important;
+  font-size: clamp(28px, 6vw, 64px) !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+  margin-bottom: 24px !important;
+  letter-spacing: -0.03em !important;
+  padding-bottom: 15px !important;
+  word-break: break-word !important;
+}
+ 
+.text-highlight {
+  background: linear-gradient(90deg,#3B82F6,#06B6D4) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  display: inline-block !important;
+  padding-bottom: 5px !important;
+}
+ 
+.content-description {
+  color: rgba(255,255,255,0.85) !important;
+  font-size: 18px !important;
+  line-height: 1.6 !important;
+  margin-bottom: 50px !important;
+  max-width: 95% !important;
+}
+ 
+.content-features-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 16px !important;
+  width: 100% !important;
+}
+ 
+.feature-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 15px !important;
+  padding: 16px 20px !important;
+  background: rgba(59,130,246,0.08) !important;
+  border: 1px solid rgba(59,130,246,0.3) !important;
+  border-radius: 16px !important;
+  backdrop-filter: blur(15px) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+  transition: all .3s ease !important;
+}
+ 
+.feature-card:hover {
+  background: rgba(59,130,246,0.15) !important;
+  border-color: rgba(59,130,246,0.6) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 10px 30px rgba(59,130,246,0.25) !important;
+}
+ 
+.feature-icon-box { font-size: 20px !important; }
+.feature-text { color: rgba(255,255,255,0.95) !important; font-size: 15px !important; font-weight: 600 !important; }
+ 
+main > section:last-child {
+  width: 50% !important;
+  min-width: 320px !important;
+  background: none !important;
+  position: relative !important;
+  z-index: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 0 40px !important;
+  box-sizing: border-box !important;
+}
+ 
+main > section:last-child > div {
+  width: 100% !important;
+  max-width: 580px !important;
+  background: #0a0a0f !important;
+  border: 1px solid rgba(59,130,246,0.15) !important;
+  border-radius: 24px !important;
+  padding: 50px !important;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.7) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+ 
+.form-pretitle { color: #3B82F6 !important; font-size: 12px !important; font-weight: 800 !important; letter-spacing: .15em !important; margin-bottom: 12px !important; text-transform: uppercase !important; }
+.form-title { color: #fff !important; font-size: 36px !important; font-weight: 800 !important; margin-bottom: 10px !important; }
+.form-subtitle { color: rgba(255,255,255,0.6) !important; font-size: 15px !important; margin-bottom: 32px !important; }
+ 
+form input {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: white !important;
+  border-radius: 10px !important;
+  padding: 14px 18px !important;
+  font-size: 15px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+ 
+form input:focus { outline: none !important; background: rgba(255,255,255,0.05) !important; border-color: #3B82F6 !important; }
+ 
+form label { color: rgba(255,255,255,0.8) !important; font-size: 14px !important; font-weight: 600 !important; margin-bottom: 8px !important; display:block !important; }
+ 
+button[type="submit"] {
+  background: linear-gradient(90deg,#3B82F6 0%,#06B6D4 100%) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .05em !important;
+  padding: 16px !important;
+  font-size: 16px !important;
+  margin-top: 20px !important;
+  width: 100% !important;
+  box-shadow: 0 10px 20px rgba(59,130,246,0.3) !important;
+}
+ 
+.divider { display:flex !important; align-items:center !important; width:100% !important; color: rgba(255,255,255,0.5) !important; font-size:12px !important; font-weight:700 !important; margin:30px 0 !important; text-transform:uppercase !important; }
+.divider::before, .divider::after { content:"" !important; flex:1 !important; height:1px !important; background: rgba(255,255,255,0.15) !important; }
+.divider::before { margin-right:15px !important; }
+.divider::after { margin-left:15px !important; }
+ 
+label[for="password"] a { color: #60A5FA !important; text-decoration: none !important; font-weight:700 !important; font-size:13px !important; }
+label[for="password"] a:hover { color:#fff !important; text-decoration: underline !important; }
+ 
+.form-footer { text-align:center !important; font-size:14px !important; }
+.footer-question { color:#fff !important; font-weight:600 !important; margin-right:5px !important; }
+.footer-cta {
+  background: linear-gradient(90deg,#3B82F6,#06B6D4) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight:800 !important;
+  text-transform: uppercase !important;
+  font-size:14px !important;
+  letter-spacing:.05em !important;
+  text-decoration:none !important;
+  white-space: nowrap !important;
+}
+.footer-cta:hover { text-decoration: underline !important; }
+ 
+/* CHATWOOT CUSTOM STYLE - GLASS BLUE */
+.woot-widget-bubble, .woot-widget-holder {
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+    backdrop-filter: blur( 10px ) !important;
+    -webkit-backdrop-filter: blur( 10px ) !important;
+    border: 1px solid rgba( 255, 255, 255, 0.18 ) !important;
+}
+.woot-widget-bubble {
+    background: linear-gradient(135deg, rgba(59,130,246,0.9), rgba(6,182,212,0.9)) !important;
+}
+ 
+@media (max-width: 968px) {
+  html, body { overflow-y: auto !important; overflow-x: hidden !important; height: auto !important; }
+  .flex.min-h-screen, main { flex-direction: column !important; height: auto !important; min-height: 100vh !important; overflow-y: visible !important; justify-content: flex-start !important; align-items: center !important; padding-top: 20px !important; }
+  main > section:first-child { width: 100% !important; align-items: center !important; padding: 40px 20px 20px 20px !important; text-align: center !important; }
+  .custom-wrapper { text-align: center !important; align-items: center !important; margin: 0 auto !important; }
+  .header-row { margin-bottom: 30px !important; justify-content: center !important; gap: 20px !important; }
+  .content-title { font-size: 36px !important; margin-bottom: 15px !important; }
+  .content-description { margin-bottom: 30px !important; max-width: 100% !important; font-size: 16px !important; }
+  main > section:last-child { width: 100% !important; align-items: center !important; padding: 20px 20px 60px 20px !important; }
+  main > section:last-child > div { max-width: 100% !important; padding: 30px 20px !important; margin: 0 auto !important; }
+  .footer-cta { white-space: normal !important; }
+}
+ 
+@media (max-width: 600px) {
+  .content-features-grid { display: none !important; }
+}
+`;
+    const injectCSS = (css, id) => {
+      const ex = document.getElementById(id);
+      if (ex) ex.remove();
+      const s = document.createElement("style");
+      s.id = id;
+      s.textContent = css;
+      document.head.appendChild(s);
+    };
+    injectCSS(loginCSS, "login-template-styles");
+ 
+    // ==================================================================
+    // CHATWOOT INJECTION
+    // ==================================================================
+    window.chatwootSettings = {
+      "position": "right",
+      "type": "standard",
+      "launcherTitle": "Fale conosco no chat"
+    };
+    (function(d, t) {
+      var BASE_URL = "https://develop.omniforge.com.br";
+      var g = d.createElement(t),
+        s = d.getElementsByTagName(t)[0];
+      g.src = BASE_URL + "/packs/js/sdk.js";
+      g.async = true;
+      s.parentNode.insertBefore(g, s);
+      g.onload = function() {
+        window.chatwootSDK.run({
+          websiteToken: 'nQE1noMDdduSvoPejkzNpQPn',
+          baseUrl: BASE_URL
+        })
+      }
+    })(document, "script");
+ 
+  }
+  console.log("Template Login Rotativo + Chatwoot Glass carregado");
+</script>
