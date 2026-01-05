@@ -1,0 +1,199 @@
+<script>
+(function () {
+  console.log("[OmniForge] Compartilhar contato (Webhook restaurado)");
+
+  const BTN_ID = "omniforge-share-contact";
+  const MODAL_ID = "omniforge-share-contact-modal";
+
+  /* 🔗 WEBHOOK ORIGINAL */
+  const WEBHOOK_URL = "https://n8n.skycracker.com.br/webhook/compartilha_conato";
+
+  /* ===============================
+     CONTEXTO
+  =============================== */
+  function getContext() {
+    const path = window.location.pathname;
+    return {
+      account_id: path.match(/accounts\/(\d+)/)?.[1] || null,
+      conversation_id: path.match(/conversations\/(\d+)/)?.[1] || null,
+    };
+  }
+
+  /* ===============================
+     BOTÃO NA BARRA (SEM LUPA)
+  =============================== */
+  function injectButton() {
+    if (document.getElementById(BTN_ID)) return;
+
+    const actionsBar = document.querySelector(
+      'div.flex.items-center.w-full.mt-0\\.5'
+    );
+    if (!actionsBar) return;
+
+    const btn = document.createElement("button");
+    btn.id = BTN_ID;
+    btn.title = "Compartilhar contato";
+    btn.className = `
+      inline-flex items-center justify-center
+      h-8 w-8
+      rounded-lg
+      bg-n-alpha-2
+      text-n-slate-12
+      hover:bg-n-alpha-3
+      transition-all
+    `;
+
+    btn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg"
+        width="18" height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round">
+        <circle cx="12" cy="7" r="4"/>
+        <path d="M5.5 21a6.5 6.5 0 0 1 13 0"/>
+      </svg>
+    `;
+
+    btn.onclick = openModal;
+    actionsBar.appendChild(btn);
+  }
+
+  /* ===============================
+     MODAL — COMPARTILHAR CONTATO
+  =============================== */
+  function openModal() {
+    if (document.getElementById(MODAL_ID)) return;
+
+    const modal = document.createElement("div");
+    modal.id = MODAL_ID;
+    modal.className = `
+      fixed inset-0 z-[999999]
+      flex items-center justify-center
+      bg-black/60 backdrop-blur-sm
+    `;
+
+    modal.innerHTML = `
+      <div class="
+        w-[400px]
+        bg-n-background
+        text-n-slate-12
+        rounded-xl
+        border border-n-weak
+        shadow-xl
+        p-5
+        font-inter
+      ">
+        <div class="flex items-center justify-between mb-4">
+          <strong>Compartilhar contato</strong>
+          <button id="close-modal"
+            class="text-n-slate-11 hover:text-n-slate-12">✕</button>
+        </div>
+
+        <label class="block text-xs text-n-slate-11 mb-1">
+          Número de telefone
+        </label>
+
+        <input
+          id="contact-phone"
+          placeholder="Digite o telefone"
+          class="
+            w-full
+            px-3 py-2
+            rounded-lg
+            bg-n-solid-2
+            border border-n-weak
+            text-n-slate-12
+            focus:outline-none
+            focus:border-n-blue
+          "
+        />
+
+        <div class="flex justify-end gap-2 mt-5">
+          <button id="cancel"
+            class="
+              px-4 py-2
+              rounded-lg
+              bg-n-alpha-2
+              text-n-slate-12
+              hover:bg-n-alpha-3
+            ">Cancelar</button>
+
+          <button id="send"
+            class="
+              px-4 py-2
+              rounded-lg
+              bg-n-blue
+              text-white
+              hover:bg-n-blue/90
+            ">Enviar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById("close-modal").onclick = closeModal;
+    document.getElementById("cancel").onclick = closeModal;
+    document.getElementById("send").onclick = sendContact;
+  }
+
+  function closeModal() {
+    document.getElementById(MODAL_ID)?.remove();
+  }
+
+  /* ===============================
+     ENVIO PARA WEBHOOK
+  =============================== */
+  async function sendContact() {
+    const phone = document.getElementById("contact-phone").value.trim();
+    const ctx = getContext();
+
+    if (!phone) {
+      toast("Informe um telefone");
+      return;
+    }
+
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        account_id: ctx.account_id,
+        conversation_id: ctx.conversation_id,
+        phone
+      })
+    });
+
+    closeModal();
+    toast("Contato compartilhado com sucesso");
+  }
+
+  /* ===============================
+     TOAST (MEGA STYLE)
+  =============================== */
+  function toast(msg) {
+    const t = document.createElement("div");
+    t.className = `
+      fixed top-4 right-4 z-[1000000]
+      bg-n-solid-2
+      text-n-slate-12
+      border border-n-weak
+      px-4 py-2
+      rounded-lg
+      shadow
+    `;
+    t.innerText = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+  }
+
+  /* ===============================
+     OBSERVER
+  =============================== */
+  const observer = new MutationObserver(injectButton);
+  observer.observe(document.body, { childList: true, subtree: true });
+
+})();
+</script>
