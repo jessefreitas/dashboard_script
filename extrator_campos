@@ -1,414 +1,294 @@
-// 🔍 MODO RAIO-X - VISUALIZADOR COMPLETO DE ESTRUTURA
+// EXTRATOR COMPLETO DE ESTRUTURA FRONT-END
 // Execute no console do navegador (F12)
 
 (function() {
-    // Remover visualizador anterior se existir
-    if (window.structureViewer) {
-        window.structureViewer.destroy();
-    }
-
-    const viewer = {
-        active: false,
-        overlays: [],
-        labels: [],
-        controlPanel: null,
-        selectedElement: null,
-        
-        colors: [
-            '#FF0000', '#00FF00', '#0088FF', '#FF00FF', 
-            '#FFFF00', '#00FFFF', '#FF8800', '#8800FF',
-            '#FF0088', '#88FF00', '#0088FF', '#FF8888'
-        ],
-
-        init() {
-            this.createControlPanel();
-            this.activate();
-            console.log('🔍 Modo Raio-X ativado!');
+    console.clear();
+    console.log('🔍 Iniciando extração completa do front-end...\n');
+    
+    const report = {
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
+        title: document.title,
+        stats: {
+            totalElements: 0,
+            totalClasses: 0,
+            totalIds: 0,
+            uniqueClasses: new Set(),
+            uniqueIds: new Set(),
+            elementTypes: {}
         },
-
-        createControlPanel() {
-            const panel = document.createElement('div');
-            panel.id = 'xray-control-panel';
-            panel.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-                color: #fff;
-                padding: 20px;
-                border-radius: 12px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.8);
-                z-index: 999999;
-                font-family: 'Segoe UI', Arial, sans-serif;
-                min-width: 300px;
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255,255,255,0.1);
-            `;
-
-            panel.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                    <h3 style="margin: 0; color: #00ff88; font-size: 18px;">🔍 Modo Raio-X</h3>
-                    <button id="xray-close" style="background: #ff4444; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">✖</button>
-                </div>
-                
-                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
-                            <input type="checkbox" id="xray-borders" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
-                            <span>🎨 Bordas Coloridas</span>
-                        </label>
-                    </div>
-                    
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
-                            <input type="checkbox" id="xray-labels" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
-                            <span>🏷️ Labels de Elementos</span>
-                        </label>
-                    </div>
-                    
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
-                            <input type="checkbox" id="xray-hover" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
-                            <span>👆 Highlight ao Passar</span>
-                        </label>
-                    </div>
-                    
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
-                            <input type="checkbox" id="xray-spacing" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
-                            <span>📏 Mostrar Espaçamentos</span>
-                        </label>
-                    </div>
-                    
-                    <div>
-                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
-                            <input type="checkbox" id="xray-grid" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
-                            <span>📐 Grid de Referência</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div style="background: rgba(0,255,136,0.1); padding: 10px; border-radius: 6px; border-left: 3px solid #00ff88; font-size: 12px; margin-bottom: 15px;">
-                    <strong>💡 Dica:</strong> Clique em qualquer elemento para inspecionar
-                </div>
-                
-                <div id="xray-info" style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; font-size: 11px; max-height: 200px; overflow-y: auto; display: none;">
-                    <div style="color: #00ff88; font-weight: bold; margin-bottom: 5px;">📦 Elemento Selecionado:</div>
-                    <div id="xray-info-content"></div>
-                </div>
-                
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button id="xray-reset" style="flex: 1; padding: 10px; background: #0088ff; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
-                        🔄 Resetar
-                    </button>
-                    <button id="xray-screenshot" style="flex: 1; padding: 10px; background: #ff00ff; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
-                        📸 Capturar
-                    </button>
-                </div>
-            `;
-
-            document.body.appendChild(panel);
-            this.controlPanel = panel;
-            this.attachPanelEvents();
-        },
-
-        attachPanelEvents() {
-            // Fechar
-            document.getElementById('xray-close').addEventListener('click', () => this.destroy());
-            
-            // Bordas
-            document.getElementById('xray-borders').addEventListener('change', (e) => {
-                this.toggleBorders(e.target.checked);
-            });
-            
-            // Labels
-            document.getElementById('xray-labels').addEventListener('change', (e) => {
-                this.toggleLabels(e.target.checked);
-            });
-            
-            // Hover
-            document.getElementById('xray-hover').addEventListener('change', (e) => {
-                this.toggleHover(e.target.checked);
-            });
-            
-            // Espaçamentos
-            document.getElementById('xray-spacing').addEventListener('change', (e) => {
-                this.toggleSpacing(e.target.checked);
-            });
-            
-            // Grid
-            document.getElementById('xray-grid').addEventListener('change', (e) => {
-                this.toggleGrid(e.target.checked);
-            });
-            
-            // Reset
-            document.getElementById('xray-reset').addEventListener('click', () => {
-                this.deactivate();
-                this.activate();
-            });
-            
-            // Screenshot
-            document.getElementById('xray-screenshot').addEventListener('click', () => {
-                this.takeScreenshot();
-            });
-        },
-
-        activate() {
-            this.active = true;
-            this.highlightAllElements();
-            this.addHoverEffects();
-            this.addClickHandler();
-        },
-
-        highlightAllElements() {
-            const allElements = document.querySelectorAll('body *:not(#xray-control-panel):not(#xray-control-panel *)');
-            
-            allElements.forEach((element, index) => {
-                if (element.id === 'xray-control-panel' || element.closest('#xray-control-panel')) return;
-                
-                const depth = this.getDepth(element);
-                const color = this.colors[depth % this.colors.length];
-                
-                // Adicionar borda
-                const originalBorder = element.style.border;
-                const originalOutline = element.style.outline;
-                element.style.outline = `2px solid ${color}`;
-                element.style.outlineOffset = '0px';
-                element.setAttribute('data-xray-original-border', originalBorder);
-                element.setAttribute('data-xray-original-outline', originalOutline);
-                element.setAttribute('data-xray-active', 'true');
-                element.setAttribute('data-xray-depth', depth);
-                
-                // Criar label
-                this.createLabel(element, color);
-            });
-        },
-
-        createLabel(element, color) {
-            const rect = element.getBoundingClientRect();
-            if (rect.width < 20 || rect.height < 20) return; // Ignorar elementos muito pequenos
-            
-            const label = document.createElement('div');
-            label.className = 'xray-label';
-            label.style.cssText = `
-                position: absolute;
-                background: ${color};
-                color: #000;
-                padding: 2px 6px;
-                font-size: 10px;
-                font-weight: bold;
-                border-radius: 3px;
-                pointer-events: none;
-                z-index: 999998;
-                font-family: monospace;
-                white-space: nowrap;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            `;
-            
-            const tagName = element.tagName.toLowerCase();
-            const classes = element.className ? `.${element.className.split(' ').join('.')}` : '';
-            const id = element.id ? `#${element.id}` : '';
-            
-            label.textContent = `${tagName}${id}${classes}`.substring(0, 40);
-            label.style.left = `${rect.left + window.scrollX}px`;
-            label.style.top = `${rect.top + window.scrollY - 20}px`;
-            
-            document.body.appendChild(label);
-            this.labels.push({ element: label, target: element });
-        },
-
-        addHoverEffects() {
-            this.hoverHandler = (e) => {
-                if (!document.getElementById('xray-hover')?.checked) return;
-                if (e.target.closest('#xray-control-panel')) return;
-                
-                const element = e.target;
-                if (element.getAttribute('data-xray-active')) {
-                    element.style.backgroundColor = 'rgba(255,255,0,0.2)';
-                    element.style.cursor = 'pointer';
-                }
-            };
-            
-            this.hoverOutHandler = (e) => {
-                if (e.target.closest('#xray-control-panel')) return;
-                
-                const element = e.target;
-                if (element.getAttribute('data-xray-active') && element !== this.selectedElement) {
-                    element.style.backgroundColor = '';
-                    element.style.cursor = '';
-                }
-            };
-            
-            document.addEventListener('mouseover', this.hoverHandler);
-            document.addEventListener('mouseout', this.hoverOutHandler);
-        },
-
-        addClickHandler() {
-            this.clickHandler = (e) => {
-                if (e.target.closest('#xray-control-panel')) return;
-                
-                e.preventDefault();
-                e.stopPropagation();
-                
-                if (this.selectedElement) {
-                    this.selectedElement.style.backgroundColor = '';
-                }
-                
-                this.selectedElement = e.target;
-                this.selectedElement.style.backgroundColor = 'rgba(0,255,136,0.3)';
-                this.showElementInfo(e.target);
-            };
-            
-            document.addEventListener('click', this.clickHandler, true);
-        },
-
-        showElementInfo(element) {
-            const info = document.getElementById('xray-info');
-            const content = document.getElementById('xray-info-content');
-            
-            const rect = element.getBoundingClientRect();
-            const styles = window.getComputedStyle(element);
-            
-            content.innerHTML = `
-                <div style="margin-bottom: 8px;">
-                    <strong style="color: #00ff88;">Tag:</strong> ${element.tagName.toLowerCase()}
-                </div>
-                ${element.id ? `<div style="margin-bottom: 8px;"><strong style="color: #0088ff;">ID:</strong> #${element.id}</div>` : ''}
-                ${element.className ? `<div style="margin-bottom: 8px;"><strong style="color: #ff00ff;">Classes:</strong> ${element.className}</div>` : ''}
-                <div style="margin-bottom: 8px;">
-                    <strong style="color: #ffff00;">Dimensões:</strong> ${Math.round(rect.width)}px × ${Math.round(rect.height)}px
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <strong style="color: #ff8800;">Posição:</strong> x:${Math.round(rect.left)}, y:${Math.round(rect.top)}
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <strong style="color: #00ffff;">Display:</strong> ${styles.display}
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <strong style="color: #ff0088;">Position:</strong> ${styles.position}
-                </div>
-                <div>
-                    <strong style="color: #88ff00;">Z-index:</strong> ${styles.zIndex}
-                </div>
-            `;
-            
-            info.style.display = 'block';
-        },
-
-        toggleBorders(show) {
-            const elements = document.querySelectorAll('[data-xray-active]');
-            elements.forEach(el => {
-                el.style.outline = show ? el.style.outline : 'none';
-            });
-        },
-
-        toggleLabels(show) {
-            this.labels.forEach(({ element }) => {
-                element.style.display = show ? 'block' : 'none';
-            });
-        },
-
-        toggleHover(enabled) {
-            // O handler já verifica o checkbox
-        },
-
-        toggleSpacing(show) {
-            if (show) {
-                const elements = document.querySelectorAll('[data-xray-active]');
-                elements.forEach(el => {
-                    const styles = window.getComputedStyle(el);
-                    const margin = `${styles.marginTop} ${styles.marginRight} ${styles.marginBottom} ${styles.marginLeft}`;
-                    const padding = `${styles.paddingTop} ${styles.paddingRight} ${styles.paddingBottom} ${styles.paddingLeft}`;
-                    
-                    el.style.boxShadow = `inset 0 0 0 2px rgba(255,0,0,0.3), 0 0 0 2px rgba(0,255,0,0.3)`;
-                });
-            } else {
-                const elements = document.querySelectorAll('[data-xray-active]');
-                elements.forEach(el => {
-                    el.style.boxShadow = '';
-                });
-            }
-        },
-
-        toggleGrid(show) {
-            if (show) {
-                const grid = document.createElement('div');
-                grid.id = 'xray-grid';
-                grid.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background-image: 
-                        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
-                    background-size: 20px 20px;
-                    pointer-events: none;
-                    z-index: 999997;
-                `;
-                document.body.appendChild(grid);
-            } else {
-                document.getElementById('xray-grid')?.remove();
-            }
-        },
-
-        takeScreenshot() {
-            alert('📸 Use a ferramenta de screenshot do navegador (Ctrl+Shift+S no Firefox ou extensão no Chrome)');
-        },
-
-        getDepth(element) {
-            let depth = 0;
-            let parent = element.parentElement;
-            while (parent) {
-                depth++;
-                parent = parent.parentElement;
-            }
-            return depth;
-        },
-
-        deactivate() {
-            // Remover bordas
-            const elements = document.querySelectorAll('[data-xray-active]');
-            elements.forEach(el => {
-                el.style.outline = el.getAttribute('data-xray-original-outline') || '';
-                el.style.border = el.getAttribute('data-xray-original-border') || '';
-                el.style.backgroundColor = '';
-                el.style.cursor = '';
-                el.style.boxShadow = '';
-                el.removeAttribute('data-xray-active');
-                el.removeAttribute('data-xray-original-border');
-                el.removeAttribute('data-xray-original-outline');
-                el.removeAttribute('data-xray-depth');
-            });
-            
-            // Remover labels
-            this.labels.forEach(({ element }) => element.remove());
-            this.labels = [];
-            
-            // Remover grid
-            document.getElementById('xray-grid')?.remove();
-            
-            // Remover event listeners
-            if (this.hoverHandler) {
-                document.removeEventListener('mouseover', this.hoverHandler);
-                document.removeEventListener('mouseout', this.hoverOutHandler);
-            }
-            if (this.clickHandler) {
-                document.removeEventListener('click', this.clickHandler, true);
-            }
-        },
-
-        destroy() {
-            this.deactivate();
-            this.controlPanel?.remove();
-            delete window.structureViewer;
-            console.log('🔍 Modo Raio-X desativado!');
-        }
+        structure: [],
+        classList: {},
+        idList: {},
+        customAttributes: {}
     };
 
-    viewer.init();
-    window.structureViewer = viewer;
+    // Função para extrair todos os atributos custom (data-*, aria-*, etc)
+    function getCustomAttributes(element) {
+        const attrs = {};
+        for (let attr of element.attributes) {
+            if (attr.name.startsWith('data-') || 
+                attr.name.startsWith('aria-') || 
+                attr.name.startsWith('ng-') ||
+                attr.name.startsWith('v-') ||
+                attr.name.startsWith('x-')) {
+                attrs[attr.name] = attr.value;
+            }
+        }
+        return attrs;
+    }
+
+    // Função para obter o seletor único do elemento
+    function getUniqueSelector(element) {
+        if (element.id) return `#${element.id}`;
+        
+        let path = [];
+        while (element && element.nodeType === Node.ELEMENT_NODE) {
+            let selector = element.nodeName.toLowerCase();
+            if (element.className) {
+                selector += '.' + Array.from(element.classList).join('.');
+            }
+            path.unshift(selector);
+            element = element.parentNode;
+            if (path.length > 5) break; // Limitar profundidade
+        }
+        return path.join(' > ');
+    }
+
+    // Função recursiva para mapear a árvore DOM
+    function mapElement(element, depth = 0) {
+        if (!element || element.nodeType !== Node.ELEMENT_NODE) return null;
+
+        const tagName = element.tagName.toLowerCase();
+        const classes = Array.from(element.classList);
+        const id = element.id || null;
+        const customAttrs = getCustomAttributes(element);
+
+        // Estatísticas
+        report.stats.totalElements++;
+        report.stats.elementTypes[tagName] = (report.stats.elementTypes[tagName] || 0) + 1;
+        
+        if (classes.length > 0) {
+            report.stats.totalClasses += classes.length;
+            classes.forEach(cls => report.stats.uniqueClasses.add(cls));
+        }
+        
+        if (id) {
+            report.stats.totalIds++;
+            report.stats.uniqueIds.add(id);
+        }
+
+        // Catalogar classes por elemento
+        if (classes.length > 0) {
+            classes.forEach(cls => {
+                if (!report.classList[cls]) {
+                    report.classList[cls] = [];
+                }
+                report.classList[cls].push({
+                    tag: tagName,
+                    selector: getUniqueSelector(element),
+                    depth: depth
+                });
+            });
+        }
+
+        // Catalogar IDs
+        if (id) {
+            report.idList[id] = {
+                tag: tagName,
+                classes: classes,
+                selector: getUniqueSelector(element)
+            };
+        }
+
+        // Catalogar atributos custom
+        if (Object.keys(customAttrs).length > 0) {
+            Object.keys(customAttrs).forEach(attr => {
+                if (!report.customAttributes[attr]) {
+                    report.customAttributes[attr] = [];
+                }
+                report.customAttributes[attr].push({
+                    tag: tagName,
+                    value: customAttrs[attr],
+                    selector: getUniqueSelector(element)
+                });
+            });
+        }
+
+        // Criar nó da estrutura
+        const node = {
+            tag: tagName,
+            classes: classes,
+            id: id,
+            depth: depth,
+            selector: getUniqueSelector(element),
+            customAttributes: customAttrs,
+            children: []
+        };
+
+        // Processar filhos
+        Array.from(element.children).forEach(child => {
+            const childNode = mapElement(child, depth + 1);
+            if (childNode) {
+                node.children.push(childNode);
+            }
+        });
+
+        return node;
+    }
+
+    // Iniciar extração
+    const rootNode = mapElement(document.body);
+    report.structure.push(rootNode);
+
+    // Converter Sets para Arrays
+    report.stats.uniqueClasses = Array.from(report.stats.uniqueClasses).sort();
+    report.stats.uniqueIds = Array.from(report.stats.uniqueIds).sort();
+
+    // ============== SAÍDA DOS RESULTADOS ==============
     
-    return viewer;
+    console.log('📊 ESTATÍSTICAS GERAIS');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`Total de elementos: ${report.stats.totalElements}`);
+    console.log(`Total de classes (duplicadas): ${report.stats.totalClasses}`);
+    console.log(`Classes únicas: ${report.stats.uniqueClasses.length}`);
+    console.log(`IDs únicos: ${report.stats.uniqueIds.length}`);
+    console.log('\n');
+
+    console.log('📦 ELEMENTOS POR TIPO');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.table(report.stats.elementTypes);
+    console.log('\n');
+
+    console.log('🎨 TODAS AS CLASSES ÚNICAS');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    report.stats.uniqueClasses.forEach(cls => {
+        console.log(`  • ${cls} (usado ${report.classList[cls].length}x)`);
+    });
+    console.log('\n');
+
+    console.log('🆔 TODOS OS IDs');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    report.stats.uniqueIds.forEach(id => {
+        const info = report.idList[id];
+        console.log(`  • #${id} → <${info.tag}> ${info.classes.length > 0 ? `[${info.classes.join(', ')}]` : ''}`);
+    });
+    console.log('\n');
+
+    console.log('🔧 ATRIBUTOS CUSTOMIZADOS');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    Object.keys(report.customAttributes).forEach(attr => {
+        console.log(`  • ${attr} (usado ${report.customAttributes[attr].length}x)`);
+    });
+    console.log('\n');
+
+    // ============== GERAR ARQUIVOS PARA DOWNLOAD ==============
+    
+    // 1. Relatório completo JSON
+    const jsonBlob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const jsonUrl = URL.createObjectURL(jsonBlob);
+    
+    // 2. Lista de classes em texto
+    const classesText = report.stats.uniqueClasses.map(cls => {
+        const usage = report.classList[cls];
+        return `${cls}\n  Usado em: ${usage.map(u => u.tag).join(', ')}\n  Frequência: ${usage.length}x\n`;
+    }).join('\n');
+    const classesBlob = new Blob([classesText], { type: 'text/plain' });
+    const classesUrl = URL.createObjectURL(classesBlob);
+    
+    // 3. Estrutura HTML simplificada
+    function generateHTMLStructure(node, indent = 0) {
+        const spaces = '  '.repeat(indent);
+        let html = `${spaces}<${node.tag}`;
+        if (node.id) html += ` id="${node.id}"`;
+        if (node.classes.length > 0) html += ` class="${node.classes.join(' ')}"`;
+        html += '>\n';
+        
+        node.children.forEach(child => {
+            html += generateHTMLStructure(child, indent + 1);
+        });
+        
+        html += `${spaces}</${node.tag}>\n`;
+        return html;
+    }
+    const htmlStructure = generateHTMLStructure(rootNode);
+    const htmlBlob = new Blob([htmlStructure], { type: 'text/html' });
+    const htmlUrl = URL.createObjectURL(htmlBlob);
+    
+    // 4. CSS com todas as classes (template)
+    const cssTemplate = report.stats.uniqueClasses.map(cls => {
+        return `.${cls} {\n  /* Usado ${report.classList[cls].length}x */\n}\n`;
+    }).join('\n');
+    const cssBlob = new Blob([cssTemplate], { type: 'text/css' });
+    const cssUrl = URL.createObjectURL(cssBlob);
+
+    // ============== CRIAR LINKS DE DOWNLOAD ==============
+    
+    console.log('💾 ARQUIVOS GERADOS - CLIQUE PARA BAIXAR');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    console.log('%c📥 BAIXAR RELATÓRIO COMPLETO (JSON)', 'color: #00ff00; font-weight: bold; font-size: 14px;');
+    console.log(jsonUrl);
+    
+    console.log('\n%c📥 BAIXAR LISTA DE CLASSES (TXT)', 'color: #00ff00; font-weight: bold; font-size: 14px;');
+    console.log(classesUrl);
+    
+    console.log('\n%c📥 BAIXAR ESTRUTURA HTML', 'color: #00ff00; font-weight: bold; font-size: 14px;');
+    console.log(htmlUrl);
+    
+    console.log('\n%c📥 BAIXAR TEMPLATE CSS', 'color: #00ff00; font-weight: bold; font-size: 14px;');
+    console.log(cssUrl);
+
+    // Criar interface visual para download
+    const downloadPanel = document.createElement('div');
+    downloadPanel.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #1e1e1e;
+        color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        z-index: 999999;
+        font-family: monospace;
+        max-width: 400px;
+    `;
+    
+    downloadPanel.innerHTML = `
+        <h3 style="margin-top:0; color: #00ff00;">🔍 Extração Completa</h3>
+        <p style="font-size: 12px; margin: 10px 0;">
+            <strong>${report.stats.totalElements}</strong> elementos<br>
+            <strong>${report.stats.uniqueClasses.length}</strong> classes únicas<br>
+            <strong>${report.stats.uniqueIds.length}</strong> IDs
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+            <a href="${jsonUrl}" download="frontend-report.json" style="padding: 10px; background: #00ff00; color: #000; text-decoration: none; border-radius: 4px; text-align: center; font-weight: bold;">
+                📄 Relatório JSON
+            </a>
+            <a href="${classesUrl}" download="classes-list.txt" style="padding: 10px; background: #0088ff; color: #fff; text-decoration: none; border-radius: 4px; text-align: center; font-weight: bold;">
+                🎨 Lista de Classes
+            </a>
+            <a href="${htmlUrl}" download="structure.html" style="padding: 10px; background: #ff6600; color: #fff; text-decoration: none; border-radius: 4px; text-align: center; font-weight: bold;">
+                📦 Estrutura HTML
+            </a>
+            <a href="${cssUrl}" download="template.css" style="padding: 10px; background: #ff00ff; color: #fff; text-decoration: none; border-radius: 4px; text-align: center; font-weight: bold;">
+                💅 Template CSS
+            </a>
+        </div>
+        <button onclick="this.parentElement.remove()" style="margin-top: 15px; padding: 8px; width: 100%; background: #ff4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            ✖ Fechar
+        </button>
+    `;
+    
+    document.body.appendChild(downloadPanel);
+
+    console.log('\n✅ Extração concluída com sucesso!');
+    console.log('💡 Dica: Verifique o painel no canto superior direito da página');
+    
+    // Retornar o objeto report para análise programática
+    window.frontendReport = report;
+    console.log('\n🔗 Acesse o relatório via: window.frontendReport');
+    
+    return report;
 })();
