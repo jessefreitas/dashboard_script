@@ -1,4 +1,4 @@
-## 🛠️ Dashboard Scripts & Chatwoot Customizations
+# 🛠️ Dashboard Scripts & Chatwoot Customizations
 
 Este repositório contém uma coleção de scripts JavaScript, CSS e HTML desenvolvidos para personalizar, estender e adicionar novas funcionalidades ao frontend do Chatwoot (versão OmniForge/MEGA).Estes scripts são projetados para serem injetados no painel do Chatwoot (via Dashboard Apps ou injeção direta de script), proporcionando funcionalidades avançadas como dashboards personalizados, modais de agendamento e melhorias de UI/UX.
 
