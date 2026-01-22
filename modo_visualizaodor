@@ -1,0 +1,414 @@
+// 🔍 MODO RAIO-X - VISUALIZADOR COMPLETO DE ESTRUTURA
+// Execute no console do navegador (F12)
+
+(function() {
+    // Remover visualizador anterior se existir
+    if (window.structureViewer) {
+        window.structureViewer.destroy();
+    }
+
+    const viewer = {
+        active: false,
+        overlays: [],
+        labels: [],
+        controlPanel: null,
+        selectedElement: null,
+        
+        colors: [
+            '#FF0000', '#00FF00', '#0088FF', '#FF00FF', 
+            '#FFFF00', '#00FFFF', '#FF8800', '#8800FF',
+            '#FF0088', '#88FF00', '#0088FF', '#FF8888'
+        ],
+
+        init() {
+            this.createControlPanel();
+            this.activate();
+            console.log('🔍 Modo Raio-X ativado!');
+        },
+
+        createControlPanel() {
+            const panel = document.createElement('div');
+            panel.id = 'xray-control-panel';
+            panel.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                color: #fff;
+                padding: 20px;
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+                z-index: 999999;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                min-width: 300px;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.1);
+            `;
+
+            panel.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #00ff88; font-size: 18px;">🔍 Modo Raio-X</h3>
+                    <button id="xray-close" style="background: #ff4444; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">✖</button>
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" id="xray-borders" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>🎨 Bordas Coloridas</span>
+                        </label>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" id="xray-labels" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>🏷️ Labels de Elementos</span>
+                        </label>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" id="xray-hover" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>👆 Highlight ao Passar</span>
+                        </label>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" id="xray-spacing" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>📏 Mostrar Espaçamentos</span>
+                        </label>
+                    </div>
+                    
+                    <div>
+                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" id="xray-grid" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>📐 Grid de Referência</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(0,255,136,0.1); padding: 10px; border-radius: 6px; border-left: 3px solid #00ff88; font-size: 12px; margin-bottom: 15px;">
+                    <strong>💡 Dica:</strong> Clique em qualquer elemento para inspecionar
+                </div>
+                
+                <div id="xray-info" style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; font-size: 11px; max-height: 200px; overflow-y: auto; display: none;">
+                    <div style="color: #00ff88; font-weight: bold; margin-bottom: 5px;">📦 Elemento Selecionado:</div>
+                    <div id="xray-info-content"></div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button id="xray-reset" style="flex: 1; padding: 10px; background: #0088ff; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
+                        🔄 Resetar
+                    </button>
+                    <button id="xray-screenshot" style="flex: 1; padding: 10px; background: #ff00ff; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
+                        📸 Capturar
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(panel);
+            this.controlPanel = panel;
+            this.attachPanelEvents();
+        },
+
+        attachPanelEvents() {
+            // Fechar
+            document.getElementById('xray-close').addEventListener('click', () => this.destroy());
+            
+            // Bordas
+            document.getElementById('xray-borders').addEventListener('change', (e) => {
+                this.toggleBorders(e.target.checked);
+            });
+            
+            // Labels
+            document.getElementById('xray-labels').addEventListener('change', (e) => {
+                this.toggleLabels(e.target.checked);
+            });
+            
+            // Hover
+            document.getElementById('xray-hover').addEventListener('change', (e) => {
+                this.toggleHover(e.target.checked);
+            });
+            
+            // Espaçamentos
+            document.getElementById('xray-spacing').addEventListener('change', (e) => {
+                this.toggleSpacing(e.target.checked);
+            });
+            
+            // Grid
+            document.getElementById('xray-grid').addEventListener('change', (e) => {
+                this.toggleGrid(e.target.checked);
+            });
+            
+            // Reset
+            document.getElementById('xray-reset').addEventListener('click', () => {
+                this.deactivate();
+                this.activate();
+            });
+            
+            // Screenshot
+            document.getElementById('xray-screenshot').addEventListener('click', () => {
+                this.takeScreenshot();
+            });
+        },
+
+        activate() {
+            this.active = true;
+            this.highlightAllElements();
+            this.addHoverEffects();
+            this.addClickHandler();
+        },
+
+        highlightAllElements() {
+            const allElements = document.querySelectorAll('body *:not(#xray-control-panel):not(#xray-control-panel *)');
+            
+            allElements.forEach((element, index) => {
+                if (element.id === 'xray-control-panel' || element.closest('#xray-control-panel')) return;
+                
+                const depth = this.getDepth(element);
+                const color = this.colors[depth % this.colors.length];
+                
+                // Adicionar borda
+                const originalBorder = element.style.border;
+                const originalOutline = element.style.outline;
+                element.style.outline = `2px solid ${color}`;
+                element.style.outlineOffset = '0px';
+                element.setAttribute('data-xray-original-border', originalBorder);
+                element.setAttribute('data-xray-original-outline', originalOutline);
+                element.setAttribute('data-xray-active', 'true');
+                element.setAttribute('data-xray-depth', depth);
+                
+                // Criar label
+                this.createLabel(element, color);
+            });
+        },
+
+        createLabel(element, color) {
+            const rect = element.getBoundingClientRect();
+            if (rect.width < 20 || rect.height < 20) return; // Ignorar elementos muito pequenos
+            
+            const label = document.createElement('div');
+            label.className = 'xray-label';
+            label.style.cssText = `
+                position: absolute;
+                background: ${color};
+                color: #000;
+                padding: 2px 6px;
+                font-size: 10px;
+                font-weight: bold;
+                border-radius: 3px;
+                pointer-events: none;
+                z-index: 999998;
+                font-family: monospace;
+                white-space: nowrap;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            `;
+            
+            const tagName = element.tagName.toLowerCase();
+            const classes = element.className ? `.${element.className.split(' ').join('.')}` : '';
+            const id = element.id ? `#${element.id}` : '';
+            
+            label.textContent = `${tagName}${id}${classes}`.substring(0, 40);
+            label.style.left = `${rect.left + window.scrollX}px`;
+            label.style.top = `${rect.top + window.scrollY - 20}px`;
+            
+            document.body.appendChild(label);
+            this.labels.push({ element: label, target: element });
+        },
+
+        addHoverEffects() {
+            this.hoverHandler = (e) => {
+                if (!document.getElementById('xray-hover')?.checked) return;
+                if (e.target.closest('#xray-control-panel')) return;
+                
+                const element = e.target;
+                if (element.getAttribute('data-xray-active')) {
+                    element.style.backgroundColor = 'rgba(255,255,0,0.2)';
+                    element.style.cursor = 'pointer';
+                }
+            };
+            
+            this.hoverOutHandler = (e) => {
+                if (e.target.closest('#xray-control-panel')) return;
+                
+                const element = e.target;
+                if (element.getAttribute('data-xray-active') && element !== this.selectedElement) {
+                    element.style.backgroundColor = '';
+                    element.style.cursor = '';
+                }
+            };
+            
+            document.addEventListener('mouseover', this.hoverHandler);
+            document.addEventListener('mouseout', this.hoverOutHandler);
+        },
+
+        addClickHandler() {
+            this.clickHandler = (e) => {
+                if (e.target.closest('#xray-control-panel')) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (this.selectedElement) {
+                    this.selectedElement.style.backgroundColor = '';
+                }
+                
+                this.selectedElement = e.target;
+                this.selectedElement.style.backgroundColor = 'rgba(0,255,136,0.3)';
+                this.showElementInfo(e.target);
+            };
+            
+            document.addEventListener('click', this.clickHandler, true);
+        },
+
+        showElementInfo(element) {
+            const info = document.getElementById('xray-info');
+            const content = document.getElementById('xray-info-content');
+            
+            const rect = element.getBoundingClientRect();
+            const styles = window.getComputedStyle(element);
+            
+            content.innerHTML = `
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: #00ff88;">Tag:</strong> ${element.tagName.toLowerCase()}
+                </div>
+                ${element.id ? `<div style="margin-bottom: 8px;"><strong style="color: #0088ff;">ID:</strong> #${element.id}</div>` : ''}
+                ${element.className ? `<div style="margin-bottom: 8px;"><strong style="color: #ff00ff;">Classes:</strong> ${element.className}</div>` : ''}
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: #ffff00;">Dimensões:</strong> ${Math.round(rect.width)}px × ${Math.round(rect.height)}px
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: #ff8800;">Posição:</strong> x:${Math.round(rect.left)}, y:${Math.round(rect.top)}
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: #00ffff;">Display:</strong> ${styles.display}
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: #ff0088;">Position:</strong> ${styles.position}
+                </div>
+                <div>
+                    <strong style="color: #88ff00;">Z-index:</strong> ${styles.zIndex}
+                </div>
+            `;
+            
+            info.style.display = 'block';
+        },
+
+        toggleBorders(show) {
+            const elements = document.querySelectorAll('[data-xray-active]');
+            elements.forEach(el => {
+                el.style.outline = show ? el.style.outline : 'none';
+            });
+        },
+
+        toggleLabels(show) {
+            this.labels.forEach(({ element }) => {
+                element.style.display = show ? 'block' : 'none';
+            });
+        },
+
+        toggleHover(enabled) {
+            // O handler já verifica o checkbox
+        },
+
+        toggleSpacing(show) {
+            if (show) {
+                const elements = document.querySelectorAll('[data-xray-active]');
+                elements.forEach(el => {
+                    const styles = window.getComputedStyle(el);
+                    const margin = `${styles.marginTop} ${styles.marginRight} ${styles.marginBottom} ${styles.marginLeft}`;
+                    const padding = `${styles.paddingTop} ${styles.paddingRight} ${styles.paddingBottom} ${styles.paddingLeft}`;
+                    
+                    el.style.boxShadow = `inset 0 0 0 2px rgba(255,0,0,0.3), 0 0 0 2px rgba(0,255,0,0.3)`;
+                });
+            } else {
+                const elements = document.querySelectorAll('[data-xray-active]');
+                elements.forEach(el => {
+                    el.style.boxShadow = '';
+                });
+            }
+        },
+
+        toggleGrid(show) {
+            if (show) {
+                const grid = document.createElement('div');
+                grid.id = 'xray-grid';
+                grid.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-image: 
+                        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+                    background-size: 20px 20px;
+                    pointer-events: none;
+                    z-index: 999997;
+                `;
+                document.body.appendChild(grid);
+            } else {
+                document.getElementById('xray-grid')?.remove();
+            }
+        },
+
+        takeScreenshot() {
+            alert('📸 Use a ferramenta de screenshot do navegador (Ctrl+Shift+S no Firefox ou extensão no Chrome)');
+        },
+
+        getDepth(element) {
+            let depth = 0;
+            let parent = element.parentElement;
+            while (parent) {
+                depth++;
+                parent = parent.parentElement;
+            }
+            return depth;
+        },
+
+        deactivate() {
+            // Remover bordas
+            const elements = document.querySelectorAll('[data-xray-active]');
+            elements.forEach(el => {
+                el.style.outline = el.getAttribute('data-xray-original-outline') || '';
+                el.style.border = el.getAttribute('data-xray-original-border') || '';
+                el.style.backgroundColor = '';
+                el.style.cursor = '';
+                el.style.boxShadow = '';
+                el.removeAttribute('data-xray-active');
+                el.removeAttribute('data-xray-original-border');
+                el.removeAttribute('data-xray-original-outline');
+                el.removeAttribute('data-xray-depth');
+            });
+            
+            // Remover labels
+            this.labels.forEach(({ element }) => element.remove());
+            this.labels = [];
+            
+            // Remover grid
+            document.getElementById('xray-grid')?.remove();
+            
+            // Remover event listeners
+            if (this.hoverHandler) {
+                document.removeEventListener('mouseover', this.hoverHandler);
+                document.removeEventListener('mouseout', this.hoverOutHandler);
+            }
+            if (this.clickHandler) {
+                document.removeEventListener('click', this.clickHandler, true);
+            }
+        },
+
+        destroy() {
+            this.deactivate();
+            this.controlPanel?.remove();
+            delete window.structureViewer;
+            console.log('🔍 Modo Raio-X desativado!');
+        }
+    };
+
+    viewer.init();
+    window.structureViewer = viewer;
+    
+    return viewer;
+})();
