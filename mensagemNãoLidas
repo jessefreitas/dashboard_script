@@ -1,0 +1,366 @@
+<script>
+(function () {
+  'use strict';
+ 
+  // ================= CONFIG =================
+  const DASHBOARDS = [
+    {
+      id: 'unread',
+      linkText: 'Não Lidas',
+      linkIcon: 'i-lucide-bell-dot',
+      webhookUrl: 'https://webhook.skycracker.com.br/webhook/mensagens_n_lidasMourao1',
+      activeClass: 'cw-unread-active',
+      panelId: 'cw-embed-panel-unread',
+      iframeId: 'cw-embed-iframe-unread',
+      loadingId: 'cw-loading-unread',
+      buttonId: 'cw-unread-link'
+    },
+    {
+      id: 'kanban',
+      linkText: 'Kanban V1',
+      linkIcon: 'i-lucide-layout-dashboard',
+      webhookUrl: 'https://webhook.skycracker.com.br/webhook/workflow',
+      activeClass: 'cw-kanban-active',
+      panelId: 'cw-embed-panel-kanban',
+      iframeId: 'cw-embed-iframe-kanban',
+      loadingId: 'cw-loading-kanban',
+      buttonId: 'cw-kanban-link'
+    }
+  ];
+ 
+  const CFG = {
+    REF_LABEL: 'Caixa de Entrada',
+    AUTO_REFRESH_MS: 60000
+  };
+ 
+  // ================= HELPERS =================
+  const $ = (s, r = document) => { try { return r.querySelector(s); } catch { return null; } };
+  const $$ = (s, r = document) => { try { return Array.from(r.querySelectorAll(s)); } catch { return []; } };
+  const on = (el, ev, fn, opts) => el && el.addEventListener(ev, fn, opts || { passive: true });
+  const norm = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+ 
+  let currentAccountId = null;
+  let refreshIntervals = {};
+  let sidebarClickListener = null;
+ 
+  // ================= DETECT ACCOUNT ID =================
+  function getCurrentAccountId() {
+    const match = window.location.pathname.match(/\/app\/accounts\/(\d+)/);
+    if (match) return match[1];
+ 
+    const accountEl = $('[data-account-id]');
+    if (accountEl) return accountEl.dataset.accountId;
+ 
+    try {
+      const stored = localStorage.getItem('current_account_id');
+      if (stored) return stored;
+    } catch (e) {}
+ 
+    return null;
+  }
+ 
+  function getWebhookUrl(baseUrl) {
+    const accountId = getCurrentAccountId();
+    if (!accountId) {
+      console.warn('⚠️ Account ID não detectado. Usando webhook sem account_id.');
+      return baseUrl;
+    }
+    return `${baseUrl}?account_id=${accountId}`;
+  }
+ 
+  function findSidebar() {
+    return $('[data-testid="sidebar-primary"]') || $('aside') || $('.sidebar');
+  }
+ 
+  function findAnchorByLabel(label) {
+    const sb = findSidebar();
+    if (!sb) return null;
+    const wanted = norm(label);
+    const candidates = $$('a,button,[role="button"]', sb)
+      .filter(el => norm(el.textContent).includes(wanted));
+    if (!candidates.length) return null;
+    return candidates.find(c => !candidates.some(o => o !== c && o.contains(c))) || candidates[0];
+  }
+ 
+  // ================= CLEANUP =================
+  function cleanup() {
+    // Remover todos os botões
+    DASHBOARDS.forEach(dash => {
+      const oldBtn = $(`#${dash.buttonId}`);
+      if (oldBtn && oldBtn.parentElement) {
+        oldBtn.parentElement.remove();
+      }
+ 
+      // Fechar painéis
+      const panel = $(`#${dash.panelId}`);
+      if (panel) {
+        panel.style.display = 'none';
+      }
+ 
+      // Limpar intervals
+      if (refreshIntervals[dash.id]) {
+        clearInterval(refreshIntervals[dash.id]);
+        refreshIntervals[dash.id] = null;
+      }
+    });
+ 
+    // Remover listener de clique da sidebar
+    if (sidebarClickListener) {
+      const sb = findSidebar();
+      if (sb) {
+        sb.removeEventListener('click', sidebarClickListener, true);
+      }
+      sidebarClickListener = null;
+    }
+ 
+    console.log('🧹 Limpeza concluída');
+  }
+ 
+  // ================= PANEL =================
+  function ensurePanel(dashboard) {
+    let panel = $(`#${dashboard.panelId}`);
+ 
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = dashboard.panelId;
+      panel.style.cssText = `
+        position: fixed;
+        inset: 0 0 0 auto;
+        z-index: 9999;
+        display: none;
+        pointer-events: none;
+      `;
+ 
+      panel.innerHTML = `
+        <div id="${dashboard.loadingId}" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:auto;">
+          <div style="width:60px;height:60px;border:4px solid rgba(34,197,94,.2);border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>
+          <div style="color:#22c55e;font-size:18px;font-weight:600;">Carregando...</div>
+        </div>
+        <iframe id="${dashboard.iframeId}" style="width:100%;height:100%;border:0;display:none;pointer-events:auto;"></iframe>
+        <style>
+          @keyframes spin { to { transform: rotate(360deg); } }
+          .${dashboard.activeClass} { background-color: rgba(139,155,182,.25) !important; }
+        </style>
+      `;
+ 
+      document.body.appendChild(panel);
+ 
+      function layout() {
+        const sb = findSidebar();
+        if (!sb) return;
+        const r = sb.getBoundingClientRect();
+        panel.style.left = r.right + 'px';
+        panel.style.width = Math.max(0, window.innerWidth - r.right) + 'px';
+        panel.style.background = document.documentElement.classList.contains('dark') ? '#0A1014' : '#FCFCFC';
+      }
+ 
+      layout();
+      on(window, 'resize', layout);
+    }
+ 
+    // Criar função show específica para este dashboard
+    window[`__cwShow_${dashboard.id}`] = async () => {
+      // Fechar todos os outros painéis primeiro
+      DASHBOARDS.forEach(d => {
+        if (d.id !== dashboard.id) {
+          const otherPanel = $(`#${d.panelId}`);
+          if (otherPanel) otherPanel.style.display = 'none';
+          const otherBtn = $(`#${d.buttonId}`);
+          if (otherBtn) otherBtn.classList.remove(d.activeClass);
+          if (refreshIntervals[d.id]) {
+            clearInterval(refreshIntervals[d.id]);
+            refreshIntervals[d.id] = null;
+          }
+        }
+      });
+ 
+      const panel = $(`#${dashboard.panelId}`);
+      if (!panel) return;
+ 
+      const sb = findSidebar();
+      if (sb) {
+        const r = sb.getBoundingClientRect();
+        panel.style.left = r.right + 'px';
+        panel.style.width = Math.max(0, window.innerWidth - r.right) + 'px';
+        panel.style.background = document.documentElement.classList.contains('dark') ? '#0A1014' : '#FCFCFC';
+      }
+ 
+      panel.style.display = 'block';
+      const loading = $(`#${dashboard.loadingId}`);
+      const iframe = $(`#${dashboard.iframeId}`);
+      loading.style.display = 'block';
+      iframe.style.display = 'none';
+ 
+      if (refreshIntervals[dashboard.id]) clearInterval(refreshIntervals[dashboard.id]);
+ 
+      try {
+        const webhookUrl = getWebhookUrl(dashboard.webhookUrl);
+        console.log(`📡 [${dashboard.linkText}] Carregando de:`, webhookUrl);
+ 
+        const res = await fetch(webhookUrl, {
+          method: 'GET',
+          headers: { 'Accept': 'text/html' },
+          cache: 'no-cache'
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        loading.style.display = 'none';
+        iframe.style.display = 'block';
+ 
+        refreshIntervals[dashboard.id] = setInterval(() => {
+          if (panel.style.display === 'block') window[`__cwShow_${dashboard.id}`]();
+        }, CFG.AUTO_REFRESH_MS);
+      } catch (err) {
+        console.error(`❌ [${dashboard.linkText}] Erro ao carregar:`, err);
+        loading.innerHTML = `<div style="text-align:center;color:#f5576c;"><div style="font-size:48px;margin-bottom:16px;">⚠️</div><div style="font-size:18px;font-weight:600;">Erro ao carregar</div><div style="font-size:12px;margin-top:8px;color:#9ca3af;">Account ID: ${getCurrentAccountId() || 'não detectado'}</div></div>`;
+      }
+    };
+ 
+    // Criar função hide específica para este dashboard
+    window[`__cwHide_${dashboard.id}`] = () => {
+      const panel = $(`#${dashboard.panelId}`);
+      if (panel) panel.style.display = 'none';
+      if (refreshIntervals[dashboard.id]) {
+        clearInterval(refreshIntervals[dashboard.id]);
+        refreshIntervals[dashboard.id] = null;
+      }
+      const btn = $(`#${dashboard.buttonId}`);
+      if (btn) btn.classList.remove(dashboard.activeClass);
+    };
+ 
+    return panel;
+  }
+ 
+  // ================= SIDEBAR LINKS =================
+  function ensureSidebarLinks() {
+    const sb = findSidebar();
+    if (!sb) return;
+ 
+    const ref = findAnchorByLabel(CFG.REF_LABEL);
+    if (!ref || !ref.parentElement) return;
+ 
+    let insertAfter = ref;
+ 
+    DASHBOARDS.forEach(dashboard => {
+      // Não criar se já existe
+      if ($(`#${dashboard.buttonId}`)) return;
+ 
+      const btn = document.createElement('button');
+      btn.id = dashboard.buttonId;
+      btn.type = 'button';
+      btn.className = 'flex items-center rounded-lg min-w-0 transition-colors h-8 w-full gap-2 px-2 py-1.5 hover:bg-n-alpha-2';
+      btn.innerHTML = `<span class="${dashboard.linkIcon} size-4"></span><span class="text-sm font-medium truncate">${dashboard.linkText}</span>`;
+ 
+      // Lógica de Toggle
+      on(btn, 'click', (e) => {
+        e.stopPropagation();
+        const isActive = btn.classList.contains(dashboard.activeClass);
+        if (isActive) {
+          window[`__cwHide_${dashboard.id}`]();
+        } else {
+          btn.classList.add(dashboard.activeClass);
+          window[`__cwShow_${dashboard.id}`]();
+        }
+      });
+ 
+      const wrap = document.createElement('div');
+      wrap.appendChild(btn);
+      insertAfter.parentElement.insertBefore(wrap, insertAfter.nextSibling);
+      insertAfter = wrap;
+ 
+      console.log(`✅ Botão "${dashboard.linkText}" criado`);
+    });
+ 
+    // Fechar ao clicar fora na sidebar
+    if (!sidebarClickListener) {
+      sidebarClickListener = (e) => {
+        DASHBOARDS.forEach(dashboard => {
+          const btn = $(`#${dashboard.buttonId}`);
+          if (btn && !btn.contains(e.target)) {
+            window[`__cwHide_${dashboard.id}`]();
+          }
+        });
+      };
+      on(sb, 'click', sidebarClickListener, { capture: true });
+    }
+  }
+ 
+  // ================= BOOT =================
+  function boot() {
+    const accountId = getCurrentAccountId();
+ 
+    // Se mudou de account, fazer limpeza completa
+    if (currentAccountId && currentAccountId !== accountId) {
+      console.log('🔄 Mudança de account detectada:', currentAccountId, '→', accountId);
+      cleanup();
+    }
+ 
+    currentAccountId = accountId;
+ 
+    // Criar painéis para todos os dashboards
+    DASHBOARDS.forEach(dashboard => {
+      ensurePanel(dashboard);
+    });
+ 
+    ensureSidebarLinks();
+ 
+    console.log('✅ Dashboards carregados');
+    console.log('🏢 Account ID:', accountId || 'não detectado');
+    DASHBOARDS.forEach(dashboard => {
+      console.log(`🔗 [${dashboard.linkText}]`, getWebhookUrl(dashboard.webhookUrl));
+    });
+  }
+ 
+  // ================= INIT =================
+  if (document.readyState === 'loading') {
+    on(document, 'DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+ 
+  // Listener para o botão "Atualizar" dentro dos iframes
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'refresh') {
+      // Atualizar o dashboard atualmente ativo
+      DASHBOARDS.forEach(dashboard => {
+        const panel = $(`#${dashboard.panelId}`);
+        if (panel && panel.style.display === 'block') {
+          window[`__cwShow_${dashboard.id}`]();
+        }
+      });
+    }
+  });
+ 
+  // Observer para mudanças na sidebar E mudanças de rota
+  const observer = new MutationObserver(() => {
+    const newAccountId = getCurrentAccountId();
+    if (newAccountId !== currentAccountId) {
+      console.log('🔄 Rota mudou - Account ID:', currentAccountId, '→', newAccountId);
+      boot();
+    } else {
+      ensureSidebarLinks();
+    }
+  });
+ 
+  observer.observe(document.body, { childList: true, subtree: true });
+ 
+  // Backup: polling a cada 2 segundos para garantir
+  setInterval(() => {
+    const newAccountId = getCurrentAccountId();
+    if (newAccountId && newAccountId !== currentAccountId) {
+      console.log('🔄 [Polling] Mudança detectada:', currentAccountId, '→', newAccountId);
+      boot();
+    } else {
+      // Se algum botão sumir, recriar
+      const needsRecreate = DASHBOARDS.some(d => !$(`#${d.buttonId}`));
+      if (needsRecreate) {
+        ensureSidebarLinks();
+      }
+    }
+  }, 2000);
+})();
+</script>
