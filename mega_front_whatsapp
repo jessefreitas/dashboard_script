@@ -1,0 +1,95 @@
+<style>
+.conversation-details-wrap {
+    background-image: url(https://s3-storage.duology.com.br/duology/chat_background.png);
+}
+.conversation-panel {
+    padding-left: 4rem;
+    padding-right: 4rem;
+}
+.bg-n-solid-2{
+    background: none;
+}
+.message-bubble-container .bg-n-solid-blue {
+    max-width: 600px;
+    box-shadow: 0 1px 1px #b3b3b3;
+    background-color: #d5ffd4;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: .75rem;
+}
+.bg-n-slate-4{
+    background: #fff;
+    box-shadow: 0 1px .5px #0b141a21;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: .75rem;
+}
+.bg-n-alpha-black1 {
+    background-color: #badbb68c !important;
+    border-left: 4px solid #00d49e;
+    color: #667781 !important;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    font-weight: 300;
+}
+.left-bubble .bg-n-alpha-black1 {
+    background-color: #f6f5f4 !important;
+}
+.dark .bg-n-alpha-black1 {
+    background-color: #003f2d !important;
+    color: #99b2ab !important;
+}
+.dark .conversation-details-wrap {
+    background-image: none;
+}
+.dark .message-bubble-container .bg-n-solid-blue {
+    background: #144D37;
+    box-shadow: none;
+}
+.dark .bg-n-slate-4 {
+    background: #272a2d;
+}
+.dark {
+    scrollbar-color: rgba(255, 255, 255, .16) transparent;
+}
+.dark .conversation-details-wrap {
+    background-image: url(https://s3-storage.duology.com.br/duology/chat_dark_background.jpg);
+}
+.dark .left-bubble .bg-n-alpha-black1 {
+    background-color: #1d1e1e !important;
+    color: #a5a5a5 !important;
+}
+.text-slate-600 {
+    scrollbar-color: rgb(124 124 124 / 36%) transparent;
+}
+.reply-box {
+    margin: 0 15px 10px !important;
+}
+.conversation-details-wrap img.m-4.w-32 {
+    width: auto;
+}
+.message-bubble-container .bg-n-solid-blue .text-white {
+    color: #1c2024;
+}
+.text-white\/70 {
+    color: #00000099;
+}
+.i-lucide-check-check {
+    color: #007BFC;
+    height: 18px;
+    width: 18px;
+}
+.prose-strong\:text-white :is(:where(strong):not(:where([class~=not-prose],[class~=not-prose] *))) {
+    color: #000;
+}
+.dark .message-bubble-container .bg-n-solid-blue .text-white, .dark .prose-strong\:text-white :is(:where(strong):not(:where([class~=not-prose],[class~=not-prose] *))){
+color:#fff;
+}
+p a:is(.dark *) {
+    color: #21C063;
+}
+.prose-a\:text-white :is(:where(a):not(:where([class~=not-prose],[class~=not-prose] *))) {
+    color: #21C063;
+}
+.bg-white .bg-n-brand {
+    background: #4252fc;
+}
+</style>
